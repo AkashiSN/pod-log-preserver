@@ -1,0 +1,97 @@
+name: Release
+
+# Tag-triggered release: publishes the multi-arch image and the OCI Helm chart
+# to GHCR. The git tag (e.g. v0.5.0) must match the embedded VERSION; the chart
+# version strips the leading "v" to satisfy SemVer while the image tag and chart
+# appVersion keep it, matching the binary's self-reported version.
+#
+# One-time follow-up after the first successful publish: make the GHCR packages
+# (ghcr.io/akashisn/pod-log-preserver and ghcr.io/akashisn/charts/pod-log-preserver)
+# public in the org/user package settings — they are private by default.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/akashisn/pod-log-preserver
+  CHART_REPO: oci://ghcr.io/akashisn/charts
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify tag matches embedded VERSION
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          embedded="$(cat internal/version/VERSION)"
+          if [ "${tag}" != "${embedded}" ]; then
+            echo "::error::git tag (${tag}) does not match embedded VERSION (${embedded})"
+            exit 1
+          fi
+          echo "Releasing ${tag}"
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # The tag keeps its leading "v" to match the embedded VERSION.
+          tags: |
+            ${{ env.IMAGE }}:${{ github.ref_name }}
+            ${{ env.IMAGE }}:latest
+          # A plain multi-arch manifest (no provenance/SBOM attestation index),
+          # which is what the DaemonSet pulls.
+          provenance: false
+
+  chart:
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Derive chart version
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          # Helm chart versions are SemVer without a leading "v".
+          echo "chart_version=${tag#v}" >> "${GITHUB_OUTPUT}"
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Helm registry login
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login "${{ env.REGISTRY }}" --username "${{ github.actor }}" --password-stdin
+
+      - name: Package and push chart
+        run: |
+          # --version strips the "v" (SemVer); --app-version keeps it so the
+          # chart's default image tag resolves to the image published above.
+          helm package charts/pod-log-preserver \
+            --version "${{ steps.version.outputs.chart_version }}" \
+            --app-version "${{ github.ref_name }}"
+          helm push \
+            "pod-log-preserver-${{ steps.version.outputs.chart_version }}.tgz" \
+            "${{ env.CHART_REPO }}"
