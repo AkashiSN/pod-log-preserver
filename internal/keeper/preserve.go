@@ -1,4 +1,4 @@
-package main
+package keeper
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/AkashiSN/pod-log-preserver/internal/logging"
 )
 
 // Kubelet pod-log filename patterns, matched against a file's base name. The
@@ -71,7 +73,7 @@ func (k *Keeper) syncFile(path string) {
 	}
 
 	if _, err := k.createHardlink(path, dstDir, name, addTS); err != nil {
-		logWarn("hardlink %s: %v", path, err)
+		logging.Warn("hardlink %s: %v", path, err)
 	}
 }
 
@@ -177,6 +179,6 @@ func (k *Keeper) createHardlink(src, dstDir, dstName string, addTS bool) (bool, 
 	if err := os.Link(src, dst); err != nil {
 		return false, err
 	}
-	k.m.hardlinksCreated.Add(1)
+	k.m.HardlinksCreated.Add(1)
 	return true, nil
 }

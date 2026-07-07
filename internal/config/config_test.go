@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"reflect"
@@ -14,7 +14,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 		t.Setenv(k, "")
 	}
 
-	cfg := loadConfig()
+	cfg := Load()
 
 	want := Config{
 		WatchDir:           "/var/log/pods",
@@ -29,7 +29,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 		PreservedLogDBGlob: "/var/lib/fluent-bit/flb_kube*.db",
 	}
 	if !reflect.DeepEqual(cfg, want) {
-		t.Errorf("loadConfig() =\n  %+v\nwant\n  %+v", cfg, want)
+		t.Errorf("Load() =\n  %+v\nwant\n  %+v", cfg, want)
 	}
 }
 
@@ -48,7 +48,7 @@ func TestLoadConfigOverrides(t *testing.T) {
 	t.Setenv("METRICS_PORT", "9999")
 	t.Setenv("PRESERVED_LOG_DB_GLOB", "/x/*.db")
 
-	cfg := loadConfig()
+	cfg := Load()
 
 	if cfg.WatchDir != "/w" || cfg.PreserveDir != "/p" {
 		t.Errorf("dirs = %q, %q", cfg.WatchDir, cfg.PreserveDir)
@@ -68,7 +68,7 @@ func TestLoadConfigOverrides(t *testing.T) {
 // ignored in favor of the default rather than causing a startup error.
 func TestLoadConfigInvalidIntFallsBack(t *testing.T) {
 	t.Setenv("METRICS_PORT", "not-a-number")
-	cfg := loadConfig()
+	cfg := Load()
 	if cfg.MetricsPort != 9113 {
 		t.Errorf("MetricsPort = %d, want default 9113 on invalid int", cfg.MetricsPort)
 	}
@@ -92,7 +92,7 @@ func TestNamespaceFilterParsing(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("NAMESPACE_FILTER", tc.val)
-			cfg := loadConfig()
+			cfg := Load()
 			if !reflect.DeepEqual(cfg.NamespaceFilter, tc.want) {
 				t.Errorf("NamespaceFilter = %#v, want %#v", cfg.NamespaceFilter, tc.want)
 			}

@@ -2,11 +2,22 @@
 
 ## 5.1 Architecture
 
-A single Go binary running as a DaemonSet. The implementation is one
-`package main` split across concern-focused files (config, logging, metrics,
-inotify watching, preservation, tail-DB read, cleanup, validation) rather than
-a literal single file. Three concurrent loops share in-memory metric counters
-and coordinate shutdown via a context:
+A single Go binary running as a DaemonSet, laid out in the conventional Go
+project structure. The entry point is `cmd/pod-log-preserver`, which stays thin
+and only wires the pieces together; the concern-focused packages live under
+`internal/`:
+
+| Package | Concern |
+| --- | --- |
+| `internal/config` | environment-variable configuration (§5.4) |
+| `internal/logging` | leveled logging on the standard logger |
+| `internal/metrics` | the shared in-memory counters |
+| `internal/keeper` | the inotify watch tree and hardlink preservation (tail-DB read and cleanup join here as they land) |
+| `internal/validate` | the startup hardlink gate (§4.1) |
+| `internal/version` | the build version, `//go:embed`-ed from `internal/version/VERSION` |
+
+Three concurrent loops share the in-memory metric counters and coordinate
+shutdown via a context:
 
 1. **Event loop** — an `inotify` watch tree over the watch directory reacts to
    new files and directories, creating hardlinks as logs appear/rotate.

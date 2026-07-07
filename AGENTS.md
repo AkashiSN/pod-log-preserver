@@ -7,7 +7,8 @@ collected it. `pod-log-preserver` hardlinks `/var/log/pods/` logs into
 `/var/log/pods-preserved/`, then cleans them up only after fluent-bit's
 read-only tail DB confirms a full read (falling back to an age threshold when
 unconfirmed). It runs as a DaemonSet; the implementation is a single Go binary
-— one `package main` split across concern-focused files — with SQLite as its
+laid out in the conventional Go structure — a thin `cmd/pod-log-preserver`
+entry point over concern-focused `internal/` packages — with SQLite as its
 only external dependency.
 
 The **source of truth for design** is [`docs/specification/`](docs/specification/)

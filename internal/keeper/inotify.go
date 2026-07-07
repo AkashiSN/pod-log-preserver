@@ -1,4 +1,4 @@
-package main
+package keeper
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"unsafe"
+
+	"github.com/AkashiSN/pod-log-preserver/internal/logging"
 )
 
 // watchMask is the set of inotify events each directory watch subscribes to.
@@ -47,7 +49,7 @@ func (k *Keeper) AddWatchRecursive(root string) error {
 				if path == root {
 					return e
 				}
-				logWarn("addWatch %s: %v", path, e)
+				logging.Warn("addWatch %s: %v", path, e)
 			}
 		}
 		return nil
@@ -78,7 +80,7 @@ func (k *Keeper) forgetWatch(wd int) {
 // the mkdir and the watch being established.
 func (k *Keeper) handleNewDir(dir string) {
 	if err := k.AddWatchRecursive(dir); err != nil {
-		logWarn("watch new dir %s: %v", dir, err)
+		logging.Warn("watch new dir %s: %v", dir, err)
 	}
 	k.walkAndSync(dir)
 }
@@ -110,7 +112,7 @@ func (k *Keeper) handleEvent(ev *syscall.InotifyEvent, name string) {
 // blocks in Read (via the poller); a Close on the fd during shutdown surfaces
 // as a read error, treated as a clean stop once ctx is done. On IN_Q_OVERFLOW
 // it re-establishes watches and does a full resync to recover missed events.
-func (k *Keeper) Run(ctx context.Context) error {
+func (k *Keeper) eventLoop(ctx context.Context) error {
 	buf := make([]byte, 64*1024)
 	for {
 		n, err := k.file.Read(buf)
@@ -123,7 +125,7 @@ func (k *Keeper) Run(ctx context.Context) error {
 		for offset := 0; offset+syscall.SizeofInotifyEvent <= n; {
 			raw := (*syscall.InotifyEvent)(unsafe.Pointer(&buf[offset]))
 			if raw.Mask&syscall.IN_Q_OVERFLOW != 0 {
-				logWarn("inotify queue overflow; resyncing watch tree")
+				logging.Warn("inotify queue overflow; resyncing watch tree")
 				_ = k.AddWatchRecursive(k.cfg.WatchDir)
 				k.walkAndSync(k.cfg.WatchDir)
 			}

@@ -1,4 +1,4 @@
-package main
+package version
 
 import (
 	"strings"
@@ -10,10 +10,10 @@ import (
 // bump does not require a test edit; the invariants are that it is present and
 // carries no surrounding whitespace.
 func TestVersionEmbedded(t *testing.T) {
-	if version == "" {
-		t.Fatal("version is empty; VERSION file was not embedded")
+	if Version == "" {
+		t.Fatal("Version is empty; VERSION file was not embedded")
 	}
-	if version != strings.TrimSpace(version) {
-		t.Fatalf("version has surrounding whitespace: %q", version)
+	if Version != strings.TrimSpace(Version) {
+		t.Fatalf("Version has surrounding whitespace: %q", Version)
 	}
 }
