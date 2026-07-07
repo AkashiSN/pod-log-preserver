@@ -1,0 +1,86 @@
+package main
+
+import (
+	"os"
+	"strconv"
+	"strings"
+)
+
+// Config holds all runtime configuration, sourced entirely from environment
+// variables (spec §5.4). The compatibility surface is these env keys; changing
+// a key or default is a versioned change.
+type Config struct {
+	WatchDir           string
+	PreserveDir        string
+	CleanupIntervalSec int
+	CleanupMaxAgeMin   int
+	CleanupGzMaxAgeMin int
+	ResyncIntervalSec  int
+	NamespaceFilter    []string // nil = all namespaces; entries are glob patterns (e.g. "cdx-*")
+	LogLevel           string
+	MetricsPort        int
+	// PreservedLogDBGlob is the glob for the fluent-bit tail DBs that track the
+	// preserved log tree. Empty disables DB-aware cleanup. The default matches
+	// flb_kube*.db so DBs of other fluent-bit inputs are never read by mistake.
+	PreservedLogDBGlob string
+}
+
+// configEnvKeys lists every environment variable loadConfig reads. It exists so
+// tests can neutralize the ambient environment before asserting defaults.
+var configEnvKeys = []string{
+	"WATCH_DIR",
+	"PRESERVE_DIR",
+	"CLEANUP_INTERVAL_SEC",
+	"CLEANUP_MAX_AGE_MIN",
+	"CLEANUP_GZ_MAX_AGE_MIN",
+	"RESYNC_INTERVAL_SEC",
+	"NAMESPACE_FILTER",
+	"LOG_LEVEL",
+	"METRICS_PORT",
+	"PRESERVED_LOG_DB_GLOB",
+}
+
+// loadConfig reads configuration from the environment, applying the documented
+// default when a key is unset, empty, or (for integers) non-numeric.
+func loadConfig() Config {
+	cfg := Config{
+		WatchDir:           envStr("WATCH_DIR", "/var/log/pods"),
+		PreserveDir:        envStr("PRESERVE_DIR", "/var/log/pods-preserved"),
+		CleanupIntervalSec: envInt("CLEANUP_INTERVAL_SEC", 60),
+		CleanupMaxAgeMin:   envInt("CLEANUP_MAX_AGE_MIN", 5),
+		CleanupGzMaxAgeMin: envInt("CLEANUP_GZ_MAX_AGE_MIN", 60),
+		ResyncIntervalSec:  envInt("RESYNC_INTERVAL_SEC", 30),
+		LogLevel:           envStr("LOG_LEVEL", "info"),
+		MetricsPort:        envInt("METRICS_PORT", 9113),
+		PreservedLogDBGlob: envStr("PRESERVED_LOG_DB_GLOB", "/var/lib/fluent-bit/flb_kube*.db"),
+	}
+
+	if filter := envStr("NAMESPACE_FILTER", ""); filter != "" {
+		for _, ns := range strings.Split(filter, ",") {
+			if ns = strings.TrimSpace(ns); ns != "" {
+				cfg.NamespaceFilter = append(cfg.NamespaceFilter, ns)
+			}
+		}
+	}
+
+	return cfg
+}
+
+// envStr returns the value of key, or fallback when it is unset or empty.
+func envStr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// envInt returns key parsed as an int, or fallback when it is unset, empty, or
+// not a valid integer.
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
