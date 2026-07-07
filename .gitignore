@@ -4,6 +4,8 @@ dist/
 *.exe
 *.test
 *.out
+# Build output of `go build -o pod-log-preserver .`
+/pod-log-preserver
 
 # Go
 vendor/
