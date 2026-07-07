@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/AkashiSN/pod-log-preserver/internal/config"
 	"github.com/AkashiSN/pod-log-preserver/internal/keeper"
@@ -43,6 +48,11 @@ func main() {
 	}
 	logging.Info(cfg, "LOG_LEVEL=%s", cfg.LogLevel)
 	logging.Info(cfg, "METRICS_PORT=%d", cfg.MetricsPort)
+	if cfg.PodNamespace != "" || cfg.PodName != "" || cfg.PodUID != "" {
+		logging.Info(cfg, "POD=%s/%s (uid %s)", cfg.PodNamespace, cfg.PodName, cfg.PodUID)
+	} else {
+		logging.Info(cfg, "POD=(downward API not injected)")
+	}
 
 	if err := run(cfg); err != nil {
 		log.Fatalf("[ERROR] %v", err)
@@ -50,16 +60,24 @@ func main() {
 }
 
 // run wires up the daemon and drives the preservation path until a
-// SIGTERM/SIGINT arrives. It runs the startup hardlink gate (which also creates
-// the preserve directory), constructs the Keeper, and blocks in Keeper.Run
-// until the signal-derived context is cancelled.
+// SIGTERM/SIGINT arrives. It runs the startup filesystem validation (which also
+// creates the preserve directory), starts the metrics server, constructs the
+// Keeper, and blocks in Keeper.Run until the signal-derived context is
+// cancelled — at which point the metrics server is shut down too.
 func run(cfg config.Config) error {
 	m := &metrics.Metrics{}
 
-	// Fail fast if the watch and preserve dirs can't hardlink (spec §4.1); this
-	// also creates the preserve directory.
-	if err := validate.ValidateHardlink(cfg.WatchDir, cfg.PreserveDir); err != nil {
+	// Fail fast if the watch and preserve dirs can't hardlink (spec §4.1 / §5.2);
+	// this also creates the preserve directory. A missing own container log warns
+	// and skips rather than failing.
+	res, err := validate.ValidateFilesystem(cfg.WatchDir, cfg.PreserveDir, cfg.PodNamespace, cfg.PodName, cfg.PodUID)
+	if err != nil {
 		return err
+	}
+	if res.Skipped {
+		logging.Warn("hardlink validation skipped: %s", res.Reason)
+	} else {
+		logging.Info(cfg, "hardlink validation passed against own log %s", res.TestedLog)
 	}
 
 	k, err := keeper.New(cfg, m)
@@ -71,5 +89,44 @@ func run(cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
+	// Serve Prometheus metrics alongside the preservation loops (spec §4.2 / §5.1).
+	// The listener is bound synchronously so a bind failure (e.g. METRICS_PORT
+	// already in use) fails startup fast instead of leaving the daemon running
+	// without the endpoint the spec promises.
+	srv, err := startMetrics(cfg, m)
+	if err != nil {
+		return err
+	}
+	go func() {
+		<-ctx.Done()
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutCtx)
+	}()
+
 	return k.Run(ctx)
+}
+
+// startMetrics binds the metrics listener synchronously so a bind failure (e.g.
+// METRICS_PORT already in use) is returned to the caller and fails startup fast,
+// then serves /metrics in the background on the bound listener (spec §4.2). The
+// returned server is shut down by the caller on context cancellation.
+func startMetrics(cfg config.Config, m *metrics.Metrics) (*http.Server, error) {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", m.Handler())
+
+	addr := fmt.Sprintf(":%d", cfg.MetricsPort)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("metrics server: listen on %s: %w", addr, err)
+	}
+
+	srv := &http.Server{Handler: mux}
+	go func() {
+		logging.Info(cfg, "metrics server listening on :%d/metrics", cfg.MetricsPort)
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logging.Error("metrics server: %v", err)
+		}
+	}()
+	return srv, nil
 }

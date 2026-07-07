@@ -27,6 +27,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 		LogLevel:           "info",
 		MetricsPort:        9113,
 		PreservedLogDBGlob: "/var/lib/fluent-bit/flb_kube*.db",
+		PodNamespace:       "",
+		PodName:            "",
+		PodUID:             "",
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("Load() =\n  %+v\nwant\n  %+v", cfg, want)
@@ -47,9 +50,16 @@ func TestLoadConfigOverrides(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("METRICS_PORT", "9999")
 	t.Setenv("PRESERVED_LOG_DB_GLOB", "/x/*.db")
+	t.Setenv("POD_NAMESPACE", "kube-system")
+	t.Setenv("POD_NAME", "pod-log-preserver-abcde")
+	t.Setenv("POD_UID", "1234-5678")
 
 	cfg := Load()
 
+	if cfg.PodNamespace != "kube-system" || cfg.PodName != "pod-log-preserver-abcde" ||
+		cfg.PodUID != "1234-5678" {
+		t.Errorf("pod identity = %q, %q, %q", cfg.PodNamespace, cfg.PodName, cfg.PodUID)
+	}
 	if cfg.WatchDir != "/w" || cfg.PreserveDir != "/p" {
 		t.Errorf("dirs = %q, %q", cfg.WatchDir, cfg.PreserveDir)
 	}

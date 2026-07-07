@@ -23,6 +23,10 @@ A Prometheus endpoint is served on `METRICS_PORT` (default 9113) at `/metrics`:
 | `pod_log_preserver_db_confirmed_removed_total` | counter | Orphans removed after a tail DB confirmed a full read |
 | `pod_log_preserver_fluentbit_db_errors_total` | counter | Tail DB read errors |
 
+The listener is bound synchronously at startup; if `METRICS_PORT` cannot be
+bound (e.g. already in use), startup fails fast rather than running without the
+endpoint.
+
 Log verbosity is controlled by `LOG_LEVEL` (`debug` / `info`).
 
 ## 4.3 RBAC and security
