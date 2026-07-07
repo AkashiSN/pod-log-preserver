@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"log"
-	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -59,7 +58,9 @@ func main() {
 func run(cfg Config) error {
 	m := &metrics{}
 
-	if err := os.MkdirAll(cfg.PreserveDir, 0o755); err != nil {
+	// Fail fast if the watch and preserve dirs can't hardlink (spec §4.1); this
+	// also creates the preserve directory.
+	if err := validateHardlink(cfg.WatchDir, cfg.PreserveDir); err != nil {
 		return err
 	}
 

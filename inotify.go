@@ -30,15 +30,23 @@ func (k *Keeper) addWatch(dir string) error {
 }
 
 // AddWatchRecursive establishes a watch on root and every directory beneath it.
-// Per-directory failures are logged and skipped so one unreadable subtree does
-// not abort the walk.
+// A failure at the root — the directory is missing or cannot be watched — is
+// fatal (returned), since proceeding would leave the event loop blocked with no
+// watches. Failures on individual subtrees are logged and skipped so one
+// unreadable directory does not abort the walk.
 func (k *Keeper) AddWatchRecursive(root string) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			if path == root {
+				return err
+			}
+			return nil // skip unreadable subtree, keep walking
 		}
 		if d.IsDir() {
 			if e := k.addWatch(path); e != nil {
+				if path == root {
+					return e
+				}
 				logWarn("addWatch %s: %v", path, e)
 			}
 		}
