@@ -54,9 +54,9 @@ func New(cfg config.Config, m *metrics.Metrics) (*Keeper, error) {
 
 // Run drives the preservation path until ctx is cancelled. It does the startup
 // sync, establishes the recursive inotify watch tree, starts the periodic
-// resync, and blocks in the inotify event loop. Cancelling ctx stops the resync
-// and closes the inotify fd, which unblocks the event loop for a clean shutdown
-// (spec §5.1 / §5.2).
+// resync and the cleanup loop, and blocks in the inotify event loop. Cancelling
+// ctx stops the background loops and closes the inotify fd, which unblocks the
+// event loop for a clean shutdown (spec §5.1 / §5.2).
 func (k *Keeper) Run(ctx context.Context) error {
 	logging.Info(k.cfg, "initial sync of %s", k.cfg.WatchDir)
 	k.initialSync()
@@ -66,6 +66,7 @@ func (k *Keeper) Run(ctx context.Context) error {
 	}
 
 	go k.periodicResync(ctx, time.Duration(k.cfg.ResyncIntervalSec)*time.Second)
+	go k.cleanupLoop(ctx, time.Duration(k.cfg.CleanupIntervalSec)*time.Second)
 
 	// Close the fd when the context is cancelled so eventLoop's blocking Read
 	// returns.
