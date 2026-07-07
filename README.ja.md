@@ -8,7 +8,7 @@ EKS Auto Mode では kubelet の `containerLogMaxSize`（10MB）と `containerLo
 
 ## 仕組み
 
-DaemonSet として動作し、`/var/log/pods` を監視して各 Pod ログを同一ファイルシステム上の保全ディレクトリに**ハードリンク**する。これにより kubelet が元ファイルを削除してもバイト列は生き続ける。クリーンアップループはログエージェント（fluent-bit）の tail DB を**読み取り専用**で参照し、エージェントが読み終えた保全ファイルだけを削除する。未確認のファイルは age 閾値によるフォールバックで削除される。詳細な設計は[仕様書](docs/specification/)を参照。
+DaemonSet として動作し、`/var/log/pods` を監視して各 Pod ログを同一ファイルシステム上の保全ディレクトリに**ハードリンク**する。これにより kubelet が元ファイルを削除してもバイト列は生き続ける。クリーンアップループはログエージェント（fluent-bit）の tail DB を**読み取り専用**で参照し、エージェントが読み終えた保全ファイルだけを削除する。未確認のファイルは age 閾値によるフォールバックで削除される。詳細な設計は[仕様書](docs/ja/specification/)を参照。
 
 ## インストール（Helm）
 
@@ -22,7 +22,7 @@ helm install pod-log-preserver \
 
 ## 設定
 
-すべて環境変数で設定する（[仕様 §5.4](docs/specification/05-implementation.md#54-configuration-schema)を参照）。
+すべて環境変数で設定する（[仕様 §5.4](docs/ja/specification/05-implementation.md#54-設定スキーマ)を参照）。
 
 | 環境変数 | 既定値 | 意味 |
 |---------|-------|------|
@@ -39,7 +39,7 @@ helm install pod-log-preserver \
 
 ## メトリクス
 
-`METRICS_PORT` の `/metrics` で Prometheus エンドポイントを提供し、`pod_log_preserver_preserved_files`・`..._orphaned_files`・`..._preserved_bytes`・`..._hardlinks_created_total`・`..._orphans_removed_total`・`..._db_confirmed_removed_total`・`..._fluentbit_db_errors_total` を公開する。[仕様 §4.2](docs/specification/04-operations.md#42-observability)を参照。
+`METRICS_PORT` の `/metrics` で Prometheus エンドポイントを提供し、`pod_log_preserver_preserved_files`・`..._orphaned_files`・`..._preserved_bytes`・`..._hardlinks_created_total`・`..._orphans_removed_total`・`..._db_confirmed_removed_total`・`..._fluentbit_db_errors_total` を公開する。[仕様 §4.2](docs/ja/specification/04-operations.md#42-可観測性)を参照。
 
 ## 要件・注意点
 
@@ -47,7 +47,7 @@ helm install pod-log-preserver \
 - **root 必須**: kubelet 所有のログの読み取りとハードリンク作成に uid 0 が必要。distroless の `nonroot` タグは使えない。
 - **tail DB は読み取り専用だが rw マウント**: fluent-bit は WAL を使い、WAL reader は `-shm` インデックスへの登録に DB ディレクトリへの書き込み権限を要する。
 
-詳細は[仕様 §4](docs/specification/04-operations.md)を参照。
+詳細は[仕様 §4](docs/ja/specification/04-operations.md)を参照。
 
 ## ライセンス
 
