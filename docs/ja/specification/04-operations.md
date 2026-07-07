@@ -23,6 +23,10 @@ Prometheus エンドポイントは `METRICS_PORT`（デフォルト 9113）の 
 | `pod_log_preserver_db_confirmed_removed_total` | counter | tail DB がフルリードを確認した後に削除された孤児数 |
 | `pod_log_preserver_fluentbit_db_errors_total` | counter | Tail DB の読み取りエラー数 |
 
+リスナーは起動時に同期的にバインドされる。`METRICS_PORT` をバインドできない
+場合（例: すでに使用中）、エンドポイント無しで動作を続けるのではなく、起動を
+fail-fast させる。
+
 ログの詳細度は `LOG_LEVEL`（`debug` / `info`）によって制御される。
 
 ## 4.3 RBAC とセキュリティ

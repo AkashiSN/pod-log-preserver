@@ -13,6 +13,10 @@ import (
 // container log, then removes the link.
 const validateLinkName = ".pod-log-preserver-validate"
 
+// linkFile is os.Link behind a seam so the rotate-away race (own log vanishing
+// between location and hardlink) can be exercised deterministically in tests.
+var linkFile = os.Link
+
 // ValidationResult reports what the startup filesystem validation did so the
 // caller can log it. A zero-value result (Skipped=false, empty fields) with a
 // nil error means the hardlink test ran and passed.
@@ -38,20 +42,32 @@ func ValidateFilesystem(watchDir, preserveDir, podNamespace, podName, podUID str
 		return ValidationResult{}, fmt.Errorf("create preserve dir %s: %w", preserveDir, err)
 	}
 
-	ownLog, reason := findOwnContainerLog(watchDir, podNamespace, podName, podUID)
-	if ownLog == "" {
-		return ValidationResult{Skipped: true, Reason: reason}, nil
-	}
-
 	dst := filepath.Join(preserveDir, validateLinkName)
-	// Clear any link left by a crashed prior run before re-testing.
-	_ = os.Remove(dst)
-	if err := os.Link(ownLog, dst); err != nil {
+	// The own log can rotate or be removed by the kubelet between being located
+	// and being hard-linked. That surfaces as an ENOENT, which is a transient race
+	// rather than the same-filesystem invariant being broken — re-scan once (the
+	// kubelet reopens a fresh 0.log after rotating) before giving up and skipping.
+	// A genuine hardlink failure (e.g. EXDEV across filesystems) stays fatal.
+	for attempt := 0; attempt < 2; attempt++ {
+		ownLog, reason := findOwnContainerLog(watchDir, podNamespace, podName, podUID)
+		if ownLog == "" {
+			return ValidationResult{Skipped: true, Reason: reason}, nil
+		}
+
+		// Clear any link left by a crashed prior run before re-testing.
+		_ = os.Remove(dst)
+		err := linkFile(ownLog, dst)
+		if err == nil {
+			_ = os.Remove(dst)
+			return ValidationResult{TestedLog: ownLog}, nil
+		}
+		if os.IsNotExist(err) {
+			continue // own log rotated away mid-test; re-scan
+		}
 		return ValidationResult{}, fmt.Errorf("hardlink test %s -> %s failed (are the watch and preserve dirs on the same filesystem?): %w", ownLog, dst, err)
 	}
-	_ = os.Remove(dst)
 
-	return ValidationResult{TestedLog: ownLog}, nil
+	return ValidationResult{Skipped: true, Reason: "own container log kept rotating away during the hardlink test"}, nil
 }
 
 // findOwnContainerLog returns a regular `*.log` file belonging to this pod,

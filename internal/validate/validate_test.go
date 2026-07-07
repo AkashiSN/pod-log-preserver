@@ -3,6 +3,7 @@ package validate
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
@@ -98,6 +99,62 @@ func TestValidateFilesystemSkipsWhenOwnLogMissing(t *testing.T) {
 	}
 	if !res.Skipped || res.Reason == "" {
 		t.Fatalf("expected a skip with a reason, got %+v", res)
+	}
+}
+
+// TestValidateFilesystemSkipsWhenOwnLogVanishesDuringLink verifies that when the
+// pod's own log rotates away between being located and being hard-linked (an
+// ENOENT that persists across the single re-scan), the gate warns and skips
+// rather than crashing — matching the documented missing-own-log path.
+func TestValidateFilesystemSkipsWhenOwnLogVanishesDuringLink(t *testing.T) {
+	ns, name, uid := "default", "plp-fghij", "uid-2"
+	watch, preserve, _ := ownLogTree(t, ns, name, uid)
+
+	orig := linkFile
+	t.Cleanup(func() { linkFile = orig })
+	linkFile = func(oldname, newname string) error {
+		return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: syscall.ENOENT}
+	}
+
+	res, err := ValidateFilesystem(watch, preserve, ns, name, uid)
+	if err != nil {
+		t.Fatalf("a vanished own log should skip, not error: %v", err)
+	}
+	if !res.Skipped || res.Reason == "" {
+		t.Fatalf("expected a skip with a reason, got %+v", res)
+	}
+}
+
+// TestValidateFilesystemRecoversWhenOwnLogTransientlyMisses verifies that a
+// single transient ENOENT on the hardlink (own log rotating mid-test) is retried
+// against a fresh scan and passes, rather than skipping or crashing.
+func TestValidateFilesystemRecoversWhenOwnLogTransientlyMisses(t *testing.T) {
+	ns, name, uid := "default", "plp-fghij", "uid-2"
+	watch, preserve, ownLog := ownLogTree(t, ns, name, uid)
+
+	orig := linkFile
+	t.Cleanup(func() { linkFile = orig })
+	calls := 0
+	linkFile = func(oldname, newname string) error {
+		calls++
+		if calls == 1 {
+			return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: syscall.ENOENT}
+		}
+		return orig(oldname, newname)
+	}
+
+	res, err := ValidateFilesystem(watch, preserve, ns, name, uid)
+	if err != nil {
+		t.Fatalf("a transient ENOENT should recover on re-scan: %v", err)
+	}
+	if res.Skipped {
+		t.Fatalf("validation should recover and not skip: %+v", res)
+	}
+	if res.TestedLog != ownLog {
+		t.Errorf("TestedLog = %q, want %q", res.TestedLog, ownLog)
+	}
+	if calls != 2 {
+		t.Errorf("expected 2 link attempts (one transient miss + retry), got %d", calls)
 	}
 }
 

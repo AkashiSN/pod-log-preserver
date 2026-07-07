@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os/signal"
 	"strings"
@@ -89,15 +90,13 @@ func run(cfg config.Config) error {
 	defer stop()
 
 	// Serve Prometheus metrics alongside the preservation loops (spec §4.2 / §5.1).
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", m.Handler())
-	srv := &http.Server{Addr: fmt.Sprintf(":%d", cfg.MetricsPort), Handler: mux}
-	go func() {
-		logging.Info(cfg, "metrics server listening on :%d/metrics", cfg.MetricsPort)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logging.Error("metrics server: %v", err)
-		}
-	}()
+	// The listener is bound synchronously so a bind failure (e.g. METRICS_PORT
+	// already in use) fails startup fast instead of leaving the daemon running
+	// without the endpoint the spec promises.
+	srv, err := startMetrics(cfg, m)
+	if err != nil {
+		return err
+	}
 	go func() {
 		<-ctx.Done()
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -106,4 +105,28 @@ func run(cfg config.Config) error {
 	}()
 
 	return k.Run(ctx)
+}
+
+// startMetrics binds the metrics listener synchronously so a bind failure (e.g.
+// METRICS_PORT already in use) is returned to the caller and fails startup fast,
+// then serves /metrics in the background on the bound listener (spec §4.2). The
+// returned server is shut down by the caller on context cancellation.
+func startMetrics(cfg config.Config, m *metrics.Metrics) (*http.Server, error) {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", m.Handler())
+
+	addr := fmt.Sprintf(":%d", cfg.MetricsPort)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("metrics server: listen on %s: %w", addr, err)
+	}
+
+	srv := &http.Server{Handler: mux}
+	go func() {
+		logging.Info(cfg, "metrics server listening on :%d/metrics", cfg.MetricsPort)
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logging.Error("metrics server: %v", err)
+		}
+	}()
+	return srv, nil
 }
