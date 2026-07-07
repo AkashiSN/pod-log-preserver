@@ -1,0 +1,21 @@
+apiVersion: v2
+name: pod-log-preserver
+description: Preserve kubelet-rotated pod logs on EKS Auto Mode until a log agent has collected them.
+type: application
+# version is the chart's own SemVer; appVersion tracks the application release
+# and is the default image tag (see values.yaml). The release CI keeps both in
+# step with the git tag.
+version: 0.5.0
+appVersion: "v0.5.0"
+home: https://github.com/AkashiSN/pod-log-preserver
+sources:
+  - https://github.com/AkashiSN/pod-log-preserver
+keywords:
+  - logging
+  - kubelet
+  - daemonset
+  - fluent-bit
+  - eks
+maintainers:
+  - name: AkashiSN
+    url: https://github.com/AkashiSN
