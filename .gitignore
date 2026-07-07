@@ -1,0 +1,41 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# Go
+vendor/
+*.prof
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.envrc
+
+# Helm
+charts/*/charts/
+charts/*/Chart.lock
+
+# Per-branch git worktrees live under .worktrees/ so they stay inside the repo
+# tree (visible to editors) without being tracked. See "Parallel development
+# with worktrees" in AGENTS.md.
+.worktrees/
+
+# VitePress docs site
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+# Generated at build time from the root READMEs (see copy-readme.mjs)
+docs/getting-started.md
+docs/ja/getting-started.md
