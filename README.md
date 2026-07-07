@@ -46,7 +46,7 @@ Configured entirely via environment variables (see
 | `CLEANUP_MAX_AGE_MIN` | `5` | Age threshold for non-`.gz` orphans |
 | `CLEANUP_GZ_MAX_AGE_MIN` | `60` | Age threshold for `.gz` orphans |
 | `RESYNC_INTERVAL_SEC` | `30` | Periodic full-resync period |
-| `NAMESPACE_FILTER` | (all) | Comma-separated namespace glob patterns |
+| `NAMESPACE_FILTER` | (empty = all) | Comma-separated namespace glob patterns |
 | `LOG_LEVEL` | `info` | `debug` or `info` |
 | `METRICS_PORT` | `9113` | Prometheus metrics port |
 | `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB glob; empty disables DB-aware cleanup |

@@ -32,7 +32,7 @@ helm install pod-log-preserver \
 | `CLEANUP_MAX_AGE_MIN` | `5` | `.gz` 以外の orphan の age 閾値 |
 | `CLEANUP_GZ_MAX_AGE_MIN` | `60` | `.gz` の orphan の age 閾値 |
 | `RESYNC_INTERVAL_SEC` | `30` | 定期フルリシンクの周期 |
-| `NAMESPACE_FILTER` | （全て） | カンマ区切りの namespace glob パターン |
+| `NAMESPACE_FILTER` | （空 = すべて） | カンマ区切りの namespace glob パターン |
 | `LOG_LEVEL` | `info` | `debug` または `info` |
 | `METRICS_PORT` | `9113` | Prometheus メトリクスのポート |
 | `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | tail DB の glob。空で DB 連携クリーンアップを無効化 |
