@@ -6,8 +6,9 @@ Auto Mode the kubelet's `containerLogMaxSize` (10MB) and `containerLogMaxFiles`
 collected it. `pod-log-preserver` hardlinks `/var/log/pods/` logs into
 `/var/log/pods-preserved/`, then cleans them up only after fluent-bit's
 read-only tail DB confirms a full read (falling back to an age threshold when
-unconfirmed). It runs as a DaemonSet; the implementation is a single-file Go
-program with SQLite as its only external dependency.
+unconfirmed). It runs as a DaemonSet; the implementation is a single Go binary
+— one `package main` split across concern-focused files — with SQLite as its
+only external dependency.
 
 The **source of truth for design** is [`docs/specification/`](docs/specification/)
 (Japanese translation: [`docs/ja/specification/`](docs/ja/specification/)).
