@@ -1,0 +1,94 @@
+# Default values for pod-log-preserver.
+# This is a YAML-formatted file.
+
+image:
+  repository: ghcr.io/akashisn/pod-log-preserver
+  # tag defaults to the chart's appVersion when left empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Override the generated chart/resource names.
+nameOverride: ""
+fullnameOverride: ""
+
+# When true, the chart injects Prometheus annotation-based scrape annotations
+# (prometheus.io/scrape, prometheus.io/path, and prometheus.io/port derived from
+# config.metricsPort) so they always match the served endpoint. Set false to
+# omit them.
+prometheusScrape: true
+
+# Extra pod annotations, merged on top of the generated scrape annotations above.
+# User keys win on conflict, so a key here can override or drop a generated one.
+podAnnotations: {}
+
+# Extra pod labels merged onto the built-in selector labels.
+podLabels: {}
+
+# Annotations applied to the DaemonSet object itself.
+commonAnnotations: {}
+
+# Extra labels applied to every rendered resource.
+commonLabels: {}
+
+# Runtime configuration. Each key maps to an environment variable the binary
+# reads (see the program's config package). The values below mirror the binary's
+# built-in defaults; an empty string falls back to that default.
+config:
+  watchDir: /var/log/pods
+  preserveDir: /var/log/pods-preserved
+  cleanupIntervalSec: 60
+  cleanupMaxAgeMin: 5
+  cleanupGzMaxAgeMin: 60
+  resyncIntervalSec: 30
+  # Comma-separated glob patterns; empty means all namespaces.
+  namespaceFilter: ""
+  logLevel: info
+  metricsPort: 9113
+  preservedLogDBGlob: /var/lib/fluent-bit/flb_kube*.db
+
+# Extra environment variables appended verbatim to the container (list of
+# corev1.EnvVar). Useful for wiring a different log agent's downward-API values.
+extraEnv: []
+
+# Host directories mounted into the pod. hostLogDir must contain both
+# config.watchDir and config.preserveDir so preservation hardlinks stay on one
+# filesystem. fluentBitDBDir is mounted read-write because a mode=ro WAL reader
+# still has to register in the -shm wal-index.
+hostPaths:
+  hostLogDir: /var/log
+  fluentBitDBDir: /var/lib/fluent-bit
+
+# request == limit by default (spec §4.4): a small, predictable footprint.
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 50m
+    memory: 32Mi
+
+# Run as root (uid 0): reading kubelet-owned logs and creating hardlinks both
+# require it, so the distroless nonroot image tag is not usable.
+podSecurityContext: {}
+securityContext:
+  runAsUser: 0
+  runAsGroup: 0
+
+# Land on every node by default, including tainted/control-plane nodes.
+tolerations:
+  - operator: Exists
+
+nodeSelector: {}
+affinity: {}
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
+priorityClassName: ""
+
+# No Kubernetes API access is needed (spec §4.3), so the SA token is not mounted.
+automountServiceAccountToken: false

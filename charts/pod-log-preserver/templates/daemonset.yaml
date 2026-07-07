@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "pod-log-preserver.fullname" . }}
+  labels:
+    {{- include "pod-log-preserver.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pod-log-preserver.selectorLabels" . | nindent 6 }}
+  updateStrategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pod-log-preserver.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- /* Generate Prometheus scrape annotations from config.metricsPort so
+             they never drift from the served port, then let user-supplied
+             podAnnotations override on conflict. */}}
+      {{- $ann := dict }}
+      {{- if .Values.prometheusScrape }}
+      {{- $ann = dict "prometheus.io/scrape" "true" "prometheus.io/path" "/metrics" "prometheus.io/port" (.Values.config.metricsPort | toString) }}
+      {{- end }}
+      {{- $ann = merge (deepCopy .Values.podAnnotations) $ann }}
+      {{- with $ann }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # No Kubernetes API access is required (spec §4.3); do not mount the token.
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: pod-log-preserver
+          image: {{ include "pod-log-preserver.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: WATCH_DIR
+              value: {{ .Values.config.watchDir | quote }}
+            - name: PRESERVE_DIR
+              value: {{ .Values.config.preserveDir | quote }}
+            - name: CLEANUP_INTERVAL_SEC
+              value: {{ .Values.config.cleanupIntervalSec | quote }}
+            - name: CLEANUP_MAX_AGE_MIN
+              value: {{ .Values.config.cleanupMaxAgeMin | quote }}
+            - name: CLEANUP_GZ_MAX_AGE_MIN
+              value: {{ .Values.config.cleanupGzMaxAgeMin | quote }}
+            - name: RESYNC_INTERVAL_SEC
+              value: {{ .Values.config.resyncIntervalSec | quote }}
+            - name: NAMESPACE_FILTER
+              value: {{ .Values.config.namespaceFilter | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.config.metricsPort | quote }}
+            - name: PRESERVED_LOG_DB_GLOB
+              value: {{ .Values.config.preservedLogDBGlob | quote }}
+            # Downward API: locate this pod's own container log for the startup
+            # hardlink validation test (spec §5.2). Not a Kubernetes API call —
+            # the kubelet injects these as plain environment variables.
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.config.metricsPort }}
+              protocol: TCP
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # /var/log holds both the watch dir and the preserve dir, so a single
+            # rw mount keeps preservation hardlinks on one filesystem.
+            - name: host-log
+              mountPath: {{ .Values.hostPaths.hostLogDir }}
+            # rw so the mode=ro WAL reader can register in the -shm wal-index.
+            - name: fluent-bit-db
+              mountPath: {{ .Values.hostPaths.fluentBitDBDir }}
+      volumes:
+        - name: host-log
+          hostPath:
+            path: {{ .Values.hostPaths.hostLogDir }}
+            type: Directory
+        - name: fluent-bit-db
+          hostPath:
+            path: {{ .Values.hostPaths.fluentBitDBDir }}
+            type: DirectoryOrCreate
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
