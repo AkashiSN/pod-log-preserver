@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"log"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 )
 
 //go:embed VERSION
@@ -13,9 +17,10 @@ var versionRaw string
 // file. It must match the git tag a release is cut from (see the release CI).
 var version = strings.TrimSpace(versionRaw)
 
-// main loads configuration and logs the effective settings. The preservation,
-// cleanup, and metrics loops are wired up in later issues of the v0.5
-// milestone.
+// main loads configuration, logs the effective settings, and runs the
+// preservation path: an initial sync, a recursive inotify watch tree, and a
+// periodic resync. The cleanup loop and metrics server are wired up in later
+// issues of the v0.5 milestone.
 func main() {
 	log.SetFlags(0) // timestamps handled by container runtime
 
@@ -40,4 +45,49 @@ func main() {
 	}
 	logInfo(cfg, "LOG_LEVEL=%s", cfg.LogLevel)
 	logInfo(cfg, "METRICS_PORT=%d", cfg.MetricsPort)
+
+	if err := run(cfg); err != nil {
+		log.Fatalf("[ERROR] %v", err)
+	}
+}
+
+// run drives the preservation path until a SIGTERM/SIGINT arrives. It creates
+// the preserve directory, does the startup sync, watches the tree, starts the
+// periodic resync, and blocks in the inotify event loop. Shutdown cancels the
+// context (stopping resync) and closes the inotify fd (unblocking the loop).
+func run(cfg Config) error {
+	m := &metrics{}
+
+	// Fail fast if the watch and preserve dirs can't hardlink (spec §4.1); this
+	// also creates the preserve directory.
+	if err := validateHardlink(cfg.WatchDir, cfg.PreserveDir); err != nil {
+		return err
+	}
+
+	keeper, err := NewKeeper(cfg, m)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = keeper.Close() }()
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	logInfo(cfg, "initial sync of %s", cfg.WatchDir)
+	keeper.initialSync()
+
+	if err := keeper.AddWatchRecursive(cfg.WatchDir); err != nil {
+		return err
+	}
+
+	go keeper.periodicResync(ctx, time.Duration(cfg.ResyncIntervalSec)*time.Second)
+
+	// Close the fd when the context is cancelled so Run's blocking Read returns.
+	go func() {
+		<-ctx.Done()
+		_ = keeper.Close()
+	}()
+
+	logInfo(cfg, "watching for log events")
+	return keeper.Run(ctx)
 }
