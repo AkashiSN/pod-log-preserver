@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -25,7 +25,7 @@ type Config struct {
 	PreservedLogDBGlob string
 }
 
-// configEnvKeys lists every environment variable loadConfig reads. It exists so
+// configEnvKeys lists every environment variable Load reads. It exists so
 // tests can neutralize the ambient environment before asserting defaults.
 var configEnvKeys = []string{
 	"WATCH_DIR",
@@ -40,9 +40,9 @@ var configEnvKeys = []string{
 	"PRESERVED_LOG_DB_GLOB",
 }
 
-// loadConfig reads configuration from the environment, applying the documented
+// Load reads configuration from the environment, applying the documented
 // default when a key is unset, empty, or (for integers) non-numeric.
-func loadConfig() Config {
+func Load() Config {
 	cfg := Config{
 		WatchDir:           envStr("WATCH_DIR", "/var/log/pods"),
 		PreserveDir:        envStr("PRESERVE_DIR", "/var/log/pods-preserved"),

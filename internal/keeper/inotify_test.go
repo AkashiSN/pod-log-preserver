@@ -1,16 +1,19 @@
-package main
+package keeper
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/AkashiSN/pod-log-preserver/internal/config"
+	"github.com/AkashiSN/pod-log-preserver/internal/metrics"
 )
 
 // TestAddWatchRecursiveMissingRootFails verifies a missing/unwatchable watch
 // root is reported as an error rather than silently succeeding — otherwise the
 // event loop would block forever with no watches registered.
 func TestAddWatchRecursiveMissingRootFails(t *testing.T) {
-	k, err := NewKeeper(Config{}, &metrics{})
+	k, err := New(config.Config{}, &metrics.Metrics{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +28,7 @@ func TestAddWatchRecursiveMissingRootFails(t *testing.T) {
 // TestAddWatchRecursiveExistingRoot verifies a real tree is watched without
 // error and every directory in it is registered.
 func TestAddWatchRecursiveExistingRoot(t *testing.T) {
-	k, err := NewKeeper(Config{}, &metrics{})
+	k, err := New(config.Config{}, &metrics.Metrics{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,7 +4,7 @@ dist/
 *.exe
 *.test
 *.out
-# Build output of `go build -o pod-log-preserver .`
+# Build output of `go build -o pod-log-preserver ./cmd/pod-log-preserver`
 /pod-log-preserver
 
 # Go

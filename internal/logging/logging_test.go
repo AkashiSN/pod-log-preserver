@@ -1,10 +1,12 @@
-package main
+package logging
 
 import (
 	"bytes"
 	"log"
 	"strings"
 	"testing"
+
+	"github.com/AkashiSN/pod-log-preserver/internal/config"
 )
 
 // captureLog redirects the standard logger into a buffer for the duration of
@@ -26,12 +28,12 @@ func captureLog(t *testing.T, fn func()) string {
 
 // TestLogDebugGatedByLevel: debug lines appear only at LOG_LEVEL=debug.
 func TestLogDebugGatedByLevel(t *testing.T) {
-	if out := captureLog(t, func() { logDebug(Config{LogLevel: "info"}, "hidden %d", 1) }); out != "" {
-		t.Errorf("logDebug at info level emitted %q, want nothing", out)
+	if out := captureLog(t, func() { Debug(config.Config{LogLevel: "info"}, "hidden %d", 1) }); out != "" {
+		t.Errorf("Debug at info level emitted %q, want nothing", out)
 	}
-	out := captureLog(t, func() { logDebug(Config{LogLevel: "debug"}, "shown %d", 1) })
+	out := captureLog(t, func() { Debug(config.Config{LogLevel: "debug"}, "shown %d", 1) })
 	if !strings.Contains(out, "shown 1") || !strings.Contains(out, "[DEBUG]") {
-		t.Errorf("logDebug at debug level = %q, want it to contain the message", out)
+		t.Errorf("Debug at debug level = %q, want it to contain the message", out)
 	}
 }
 
@@ -39,22 +41,22 @@ func TestLogDebugGatedByLevel(t *testing.T) {
 // level suppresses them.
 func TestLogInfoGatedByLevel(t *testing.T) {
 	for _, lvl := range []string{"info", "debug"} {
-		out := captureLog(t, func() { logInfo(Config{LogLevel: lvl}, "hello") })
+		out := captureLog(t, func() { Info(config.Config{LogLevel: lvl}, "hello") })
 		if !strings.Contains(out, "hello") {
-			t.Errorf("logInfo at %q level = %q, want the message", lvl, out)
+			t.Errorf("Info at %q level = %q, want the message", lvl, out)
 		}
 	}
-	if out := captureLog(t, func() { logInfo(Config{LogLevel: ""}, "hi") }); out != "" {
-		t.Errorf("logInfo at empty level emitted %q, want nothing", out)
+	if out := captureLog(t, func() { Info(config.Config{LogLevel: ""}, "hi") }); out != "" {
+		t.Errorf("Info at empty level emitted %q, want nothing", out)
 	}
 }
 
 // TestLogWarnAndErrorAlwaysEmit: warn/error are unconditional.
 func TestLogWarnAndErrorAlwaysEmit(t *testing.T) {
-	if out := captureLog(t, func() { logWarn("w %d", 2) }); !strings.Contains(out, "w 2") {
-		t.Errorf("logWarn = %q, want it to contain the message", out)
+	if out := captureLog(t, func() { Warn("w %d", 2) }); !strings.Contains(out, "w 2") {
+		t.Errorf("Warn = %q, want it to contain the message", out)
 	}
-	if out := captureLog(t, func() { logError("e %d", 3) }); !strings.Contains(out, "e 3") {
-		t.Errorf("logError = %q, want it to contain the message", out)
+	if out := captureLog(t, func() { Error("e %d", 3) }); !strings.Contains(out, "e 3") {
+		t.Errorf("Error = %q, want it to contain the message", out)
 	}
 }

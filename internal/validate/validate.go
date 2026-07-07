@@ -1,4 +1,4 @@
-package main
+package validate
 
 import (
 	"fmt"
@@ -8,10 +8,10 @@ import (
 
 // probeName is the temporary file used by the startup hardlink gate. It is
 // created under the watch directory, linked into the preserve directory, and
-// removed again — both copies are cleaned up before validateHardlink returns.
+// removed again — both copies are cleaned up before ValidateHardlink returns.
 const probeName = ".pod-log-preserver-hardlink-probe"
 
-// validateHardlink is the fail-fast startup gate for the preservation invariant
+// ValidateHardlink is the fail-fast startup gate for the preservation invariant
 // (spec §4.1 / §5.2): the watch and preserve directories must share a
 // filesystem, or every os.Link would fail at runtime with logs already at risk.
 // It creates the preserve directory, then proves a hardlink from the watch
@@ -19,7 +19,7 @@ const probeName = ".pod-log-preserver-hardlink-probe"
 //
 // This is the minimal same-filesystem check; issue #6 replaces it with a test
 // against the pod's own container log.
-func validateHardlink(watchDir, preserveDir string) error {
+func ValidateHardlink(watchDir, preserveDir string) error {
 	if err := os.MkdirAll(preserveDir, 0o755); err != nil {
 		return fmt.Errorf("create preserve dir %s: %w", preserveDir, err)
 	}

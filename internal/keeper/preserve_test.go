@@ -1,4 +1,4 @@
-package main
+package keeper
 
 import (
 	"context"
@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/AkashiSN/pod-log-preserver/internal/config"
+	"github.com/AkashiSN/pod-log-preserver/internal/metrics"
 )
 
 // mkfile writes content to path, creating parent directories as needed.
@@ -29,7 +32,7 @@ func TestPeriodicResyncPreservesNewFiles(t *testing.T) {
 	if err := os.MkdirAll(watch, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	k := &Keeper{cfg: Config{WatchDir: watch, PreserveDir: preserve}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{WatchDir: watch, PreserveDir: preserve}, m: &metrics.Metrics{}}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -65,7 +68,7 @@ func TestPeriodicResyncPreservesNewFiles(t *testing.T) {
 // TestMaxAgeForPath verifies compressed logs get the longer .gz threshold and
 // everything else the plain threshold.
 func TestMaxAgeForPath(t *testing.T) {
-	k := &Keeper{cfg: Config{CleanupMaxAgeMin: 5, CleanupGzMaxAgeMin: 60}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{CleanupMaxAgeMin: 5, CleanupGzMaxAgeMin: 60}, m: &metrics.Metrics{}}
 	if got := k.maxAgeForPath("/p/ns_pod_uid/c/0.log.20231001-120000"); got != 5*time.Minute {
 		t.Fatalf("rotated maxAge = %v, want 5m", got)
 	}
@@ -80,7 +83,7 @@ func TestInitialSync(t *testing.T) {
 	dir := t.TempDir()
 	watch := filepath.Join(dir, "pods")
 	preserve := filepath.Join(dir, "preserved")
-	k := &Keeper{cfg: Config{WatchDir: watch, PreserveDir: preserve}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{WatchDir: watch, PreserveDir: preserve}, m: &metrics.Metrics{}}
 
 	mkfile(t, filepath.Join(watch, "a_p1_u1", "c", "0.log"), "a")
 	mkfile(t, filepath.Join(watch, "b_p2_u2", "c", "0.log.20231001-120000"), "b")
@@ -89,7 +92,7 @@ func TestInitialSync(t *testing.T) {
 
 	k.initialSync()
 
-	if n := k.m.hardlinksCreated.Load(); n != 3 {
+	if n := k.m.HardlinksCreated.Load(); n != 3 {
 		t.Fatalf("hardlinksCreated = %d, want 3", n)
 	}
 	if _, err := os.Stat(filepath.Join(preserve, "b_p2_u2", "c", "0.log.20231001-120000.gz")); err != nil {
@@ -105,7 +108,7 @@ func TestSyncFilePatternRouting(t *testing.T) {
 	watch := filepath.Join(dir, "pods")
 	preserve := filepath.Join(dir, "preserved")
 	relDir := filepath.Join("ns_pod_uid", "container")
-	k := &Keeper{cfg: Config{WatchDir: watch, PreserveDir: preserve}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{WatchDir: watch, PreserveDir: preserve}, m: &metrics.Metrics{}}
 
 	active := filepath.Join(watch, relDir, "0.log")
 	rotated := filepath.Join(watch, relDir, "0.log.20231001-120000")
@@ -151,7 +154,7 @@ func TestSyncFileNamespaceFilterSkips(t *testing.T) {
 	dir := t.TempDir()
 	watch := filepath.Join(dir, "pods")
 	preserve := filepath.Join(dir, "preserved")
-	k := &Keeper{cfg: Config{WatchDir: watch, PreserveDir: preserve, NamespaceFilter: []string{"team-*"}}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{WatchDir: watch, PreserveDir: preserve, NamespaceFilter: []string{"team-*"}}, m: &metrics.Metrics{}}
 
 	src := filepath.Join(watch, "other_pod_uid", "container", "0.log")
 	mkfile(t, src, "x")
@@ -160,7 +163,7 @@ func TestSyncFileNamespaceFilterSkips(t *testing.T) {
 	if _, err := os.Stat(preserve); !os.IsNotExist(err) {
 		t.Fatalf("filtered namespace should preserve nothing, but preserve dir exists (err=%v)", err)
 	}
-	if n := k.m.hardlinksCreated.Load(); n != 0 {
+	if n := k.m.HardlinksCreated.Load(); n != 0 {
 		t.Fatalf("hardlinksCreated = %d, want 0", n)
 	}
 }
@@ -201,7 +204,7 @@ func TestShouldProcessNamespaceFilter(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			k := &Keeper{cfg: Config{NamespaceFilter: tc.filter}, m: &metrics{}}
+			k := &Keeper{cfg: config.Config{NamespaceFilter: tc.filter}, m: &metrics.Metrics{}}
 			if got := k.shouldProcess(tc.rel); got != tc.want {
 				t.Fatalf("shouldProcess(%q) with filter %v = %v, want %v", tc.rel, tc.filter, got, tc.want)
 			}
@@ -217,7 +220,7 @@ func TestCreateHardlinkDedupSameInode(t *testing.T) {
 	src := filepath.Join(dir, "src", "0.log")
 	mkfile(t, src, "hello")
 	dstDir := filepath.Join(dir, "dst")
-	k := &Keeper{cfg: Config{}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{}, m: &metrics.Metrics{}}
 
 	created, err := k.createHardlink(src, dstDir, "0.log", true)
 	if err != nil {
@@ -248,7 +251,7 @@ func TestCreateHardlinkDedupSameInode(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("want 1 entry in dstDir, got %d", len(entries))
 	}
-	if got := k.m.hardlinksCreated.Load(); got != 1 {
+	if got := k.m.HardlinksCreated.Load(); got != 1 {
 		t.Fatalf("hardlinksCreated = %d, want 1", got)
 	}
 }
@@ -262,7 +265,7 @@ func TestCreateHardlinkNameCollision(t *testing.T) {
 	dstDir := filepath.Join(dir, "dst")
 	name := "0.log.20231001-120000"
 	mkfile(t, filepath.Join(dstDir, name), "OTHER")
-	k := &Keeper{cfg: Config{}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{}, m: &metrics.Metrics{}}
 
 	created, err := k.createHardlink(src, dstDir, name, false)
 	if err != nil {
@@ -279,7 +282,7 @@ func TestCreateHardlinkNameCollision(t *testing.T) {
 	if string(got) != "OTHER" {
 		t.Fatalf("collision target was overwritten: %q", got)
 	}
-	if n := k.m.hardlinksCreated.Load(); n != 0 {
+	if n := k.m.HardlinksCreated.Load(); n != 0 {
 		t.Fatalf("hardlinksCreated = %d, want 0", n)
 	}
 }
@@ -290,7 +293,7 @@ func TestCreateHardlinkNameCollision(t *testing.T) {
 func TestCreateHardlinkTimestampSuffix(t *testing.T) {
 	dir := t.TempDir()
 	dstDir := filepath.Join(dir, "dst")
-	k := &Keeper{cfg: Config{}, m: &metrics{}}
+	k := &Keeper{cfg: config.Config{}, m: &metrics.Metrics{}}
 
 	srcA := filepath.Join(dir, "a", "0.log")
 	mkfile(t, srcA, "a")
@@ -325,7 +328,7 @@ func TestCreateHardlinkTimestampSuffix(t *testing.T) {
 			t.Fatalf("unexpected destination name %q", e.Name())
 		}
 	}
-	if n := k.m.hardlinksCreated.Load(); n != 2 {
+	if n := k.m.HardlinksCreated.Load(); n != 2 {
 		t.Fatalf("hardlinksCreated = %d, want 2", n)
 	}
 }

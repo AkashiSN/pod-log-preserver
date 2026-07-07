@@ -5,8 +5,9 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
-      - 'VERSION'
+      - 'internal/version/VERSION'
       - '.golangci.yml'
+      - 'Makefile'
       - '.github/workflows/ci.yaml'
   push:
     branches:

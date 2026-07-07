@@ -1,4 +1,4 @@
-package main
+package validate
 
 import (
 	"os"
@@ -17,7 +17,7 @@ func TestValidateHardlinkSameFilesystem(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := validateHardlink(watch, preserve); err != nil {
+	if err := ValidateHardlink(watch, preserve); err != nil {
 		t.Fatalf("same-filesystem validation should pass: %v", err)
 	}
 
@@ -42,7 +42,7 @@ func TestValidateHardlinkMissingWatchDirFails(t *testing.T) {
 	watch := filepath.Join(dir, "does-not-exist")
 	preserve := filepath.Join(dir, "preserved")
 
-	if err := validateHardlink(watch, preserve); err == nil {
+	if err := ValidateHardlink(watch, preserve); err == nil {
 		t.Fatal("validation should fail fast when the watch dir is missing")
 	}
 }
