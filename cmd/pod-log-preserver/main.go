@@ -16,9 +16,9 @@ import (
 )
 
 // main loads configuration, logs the effective settings, and runs the
-// preservation path: an initial sync, a recursive inotify watch tree, and a
-// periodic resync. The cleanup loop and metrics server are wired up in later
-// issues of the v0.5 milestone.
+// preservation path: an initial sync, a recursive inotify watch tree, a
+// periodic resync, and the tail-DB-confirmed cleanup loop. The metrics server
+// is wired up in a later issue of the v0.5 milestone.
 func main() {
 	log.SetFlags(0) // timestamps handled by container runtime
 

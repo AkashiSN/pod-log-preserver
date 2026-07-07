@@ -27,8 +27,10 @@ link count:
 - `Nlink == 1` — an **orphan**; the original was deleted, only the preserved
   hardlink remains. It is a deletion candidate.
 
-For an orphaned rotated log, `pod-log-preserver` consults the log agent's tail
-DBs (loaded once per cycle, read-only). A file is **confirmed consumed** when:
+For any orphaned preserved file — including an active log's snapshot, which
+survives kubelet's rotation of its inode as the sole preserved link via inode
+dedup — `pod-log-preserver` consults the log agent's tail DBs (loaded once per
+cycle, read-only). A file is **confirmed consumed** when:
 
 1. at least one tail DB has a row for the file's inode whose recorded `name`
    ends with `/<relPath>` (the leading separator anchors the match on a path
