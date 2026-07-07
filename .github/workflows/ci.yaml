@@ -35,6 +35,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v6
+      # golangci-lint v2 (this repo's .golangci.yml is version "2") requires
+      # golangci-lint-action v7; v6 rejects v2.x version strings.
+      - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.1.6
