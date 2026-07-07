@@ -1,0 +1,8 @@
+# The image build only needs the Go module and its sources. Exclude everything
+# else so docs, CI config, node_modules, and worktrees never enter the build
+# context.
+*
+!go.mod
+!go.sum
+!*.go
+!VERSION

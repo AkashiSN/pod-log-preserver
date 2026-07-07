@@ -2,8 +2,11 @@
 
 ## 5.1 Architecture
 
-A single-file Go program running as a DaemonSet. Three concurrent loops share
-in-memory metric counters and coordinate shutdown via a context:
+A single Go binary running as a DaemonSet. The implementation is one
+`package main` split across concern-focused files (config, logging, metrics,
+inotify watching, preservation, tail-DB read, cleanup, validation) rather than
+a literal single file. Three concurrent loops share in-memory metric counters
+and coordinate shutdown via a context:
 
 1. **Event loop** — an `inotify` watch tree over the watch directory reacts to
    new files and directories, creating hardlinks as logs appear/rotate.

@@ -1,0 +1,47 @@
+name: CI
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'VERSION'
+      - '.golangci.yml'
+      - '.github/workflows/ci.yaml'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build ./...
+      - run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # golangci-lint v2 (this repo's .golangci.yml is version "2") requires
+      # golangci-lint-action v7; v6 rejects v2.x version strings. Use
+      # install-mode: goinstall so golangci-lint is built with the setup-go
+      # toolchain (matching go.mod's go directive) -- the prebuilt release
+      # binaries lag the Go version and are refused when go.mod targets a newer
+      # Go than they were built with.
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.6
+          install-mode: goinstall
