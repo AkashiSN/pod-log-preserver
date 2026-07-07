@@ -12,7 +12,7 @@ and only wires the pieces together; the concern-focused packages live under
 | `internal/config` | environment-variable configuration (§5.4) |
 | `internal/logging` | leveled logging on the standard logger |
 | `internal/metrics` | the shared in-memory counters |
-| `internal/keeper` | the inotify watch tree and hardlink preservation (tail-DB read and cleanup join here as they land) |
+| `internal/keeper` | the inotify watch tree, hardlink preservation, tail-DB read, and cleanup |
 | `internal/validate` | the startup hardlink gate (§4.1) |
 | `internal/version` | the build version, `//go:embed`-ed from `internal/version/VERSION` |
 

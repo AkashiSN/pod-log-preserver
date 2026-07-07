@@ -5,7 +5,7 @@
 - セマンティックバージョニング（`vMAJOR.MINOR.PATCH`）。
 - 設定スキーマとメトリクス名が安定するまでは pre-1.0（`v0.x.y`）とする。
 - 互換性の対象範囲は、環境変数による設定キー、Prometheus のメトリクス名、および保全ログディレクトリのレイアウトである。
-- 配布（実装と合わせて予定）: `ghcr.io/akashisn/pod-log-preserver` のマルチアーキイメージと、`oci://ghcr.io/akashisn/charts/pod-log-preserver` の OCI Helm chart を、タグトリガーのリリースワークフローによって公開する。バイナリはバージョンを埋め込み、それは git タグと一致しなければならない。
+- 配布: `ghcr.io/akashisn/pod-log-preserver` のマルチアーキイメージと、`oci://ghcr.io/akashisn/charts/pod-log-preserver` の OCI Helm chart を、タグトリガーのリリースワークフローによって公開する。バイナリはバージョンを埋め込み、それは git タグと一致しなければならない。
 - Apache License 2.0 の下でライセンスされる。
 
 ## 6.2 ロードマップ

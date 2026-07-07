@@ -9,7 +9,7 @@ DaemonSet として動作する単一バイナリの Go プログラムで、Go 
 | `internal/config` | 環境変数による設定（§5.4） |
 | `internal/logging` | 標準ロガー上のレベル別ログ |
 | `internal/metrics` | 共有のメモリ上カウンタ |
-| `internal/keeper` | inotify 監視ツリーと hardlink 保全（tail DB 読み取り・クリーンアップも今後ここに加わる） |
+| `internal/keeper` | inotify 監視ツリー・hardlink 保全・tail DB 読み取り・クリーンアップ |
 | `internal/validate` | 起動時の hardlink ゲート（§4.1） |
 | `internal/version` | ビルドバージョン。`internal/version/VERSION` を `//go:embed` で埋め込む |
 

@@ -6,7 +6,7 @@
 - Pre-1.0 (`v0.x.y`) while the configuration schema and metric names stabilize.
 - The compatibility surface is: environment-variable configuration keys,
   Prometheus metric names, and the preserved-log directory layout.
-- Distribution (planned, added with the implementation): a multi-arch image at
+- Distribution: a multi-arch image at
   `ghcr.io/akashisn/pod-log-preserver` and an OCI Helm chart at
   `oci://ghcr.io/akashisn/charts/pod-log-preserver`, published by a
   tag-triggered release workflow. The binary embeds its version, which must
