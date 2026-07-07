@@ -65,3 +65,11 @@ All configuration is via environment variables:
 | `LOG_LEVEL` | `info` | `debug` or `info` |
 | `METRICS_PORT` | `9113` | Prometheus metrics port |
 | `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB glob; empty disables DB-aware cleanup |
+| `POD_NAMESPACE` | (empty) | This pod's namespace (downward API); locates the pod's own container log for the startup hardlink test |
+| `POD_NAME` | (empty) | This pod's name (downward API) |
+| `POD_UID` | (empty) | This pod's UID (downward API) |
+
+`POD_NAMESPACE`/`POD_NAME`/`POD_UID` are injected via the Kubernetes downward
+API (not the API server). Together they locate the pod's own container log under
+`WATCH_DIR/<POD_NAMESPACE>_<POD_NAME>_<POD_UID>/` for the §5.2 startup hardlink
+test. When any is unset, the test warns and skips instead of failing.

@@ -49,3 +49,11 @@ DaemonSet として動作する単一バイナリの Go プログラムで、Go 
 | `LOG_LEVEL` | `info` | `debug` または `info` |
 | `METRICS_PORT` | `9113` | Prometheus メトリクスのポート |
 | `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB のグロブ。空にすると DB を利用したクリーンアップを無効化する |
+| `POD_NAMESPACE` | （空） | この Pod の namespace（downward API）。起動時ハードリンクテスト用に Pod 自身のコンテナログを特定する |
+| `POD_NAME` | （空） | この Pod の名前（downward API） |
+| `POD_UID` | （空） | この Pod の UID（downward API） |
+
+`POD_NAMESPACE`/`POD_NAME`/`POD_UID` は Kubernetes の downward API（API サーバー
+ではない）経由で注入される。これらを組み合わせて `WATCH_DIR/<POD_NAMESPACE>_<POD_NAME>_<POD_UID>/`
+配下にある Pod 自身のコンテナログを特定し、§5.2 の起動時ハードリンクテストに用いる。
+いずれかが未設定の場合、テストは失敗せず警告してスキップする。
