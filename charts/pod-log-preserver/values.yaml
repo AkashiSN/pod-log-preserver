@@ -13,12 +13,15 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-# Pod annotations. The defaults enable Prometheus annotation-based scraping of
-# the /metrics endpoint; keep the port in sync with config.metricsPort.
-podAnnotations:
-  prometheus.io/scrape: "true"
-  prometheus.io/port: "9113"
-  prometheus.io/path: "/metrics"
+# When true, the chart injects Prometheus annotation-based scrape annotations
+# (prometheus.io/scrape, prometheus.io/path, and prometheus.io/port derived from
+# config.metricsPort) so they always match the served endpoint. Set false to
+# omit them.
+prometheusScrape: true
+
+# Extra pod annotations, merged on top of the generated scrape annotations above.
+# User keys win on conflict, so a key here can override or drop a generated one.
+podAnnotations: {}
 
 # Extra pod labels merged onto the built-in selector labels.
 podLabels: {}

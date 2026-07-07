@@ -21,7 +21,15 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.podAnnotations }}
+      {{- /* Generate Prometheus scrape annotations from config.metricsPort so
+             they never drift from the served port, then let user-supplied
+             podAnnotations override on conflict. */}}
+      {{- $ann := dict }}
+      {{- if .Values.prometheusScrape }}
+      {{- $ann = dict "prometheus.io/scrape" "true" "prometheus.io/path" "/metrics" "prometheus.io/port" (.Values.config.metricsPort | toString) }}
+      {{- end }}
+      {{- $ann = merge (deepCopy .Values.podAnnotations) $ann }}
+      {{- with $ann }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
