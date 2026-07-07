@@ -21,11 +21,9 @@ See the [specification](docs/specification/) for the full design.
 
 ## Install (Helm)
 
-> **Planned — ships with the first release, `v0.5.0`.** The image
-> (`ghcr.io/akashisn/pod-log-preserver`) and OCI Helm chart
-> (`oci://ghcr.io/akashisn/charts/pod-log-preserver`) are published by the
-> release workflow, added with the implementation. Until then, this repo
-> carries the specification and development process only.
+The multi-arch image (`ghcr.io/akashisn/pod-log-preserver`) and the OCI Helm
+chart (`oci://ghcr.io/akashisn/charts/pod-log-preserver`) are published to GHCR
+by the release workflow. Install the DaemonSet with:
 
 ```bash
 helm install pod-log-preserver \
@@ -33,32 +31,48 @@ helm install pod-log-preserver \
   --namespace kube-system
 ```
 
+The chart runs the pod as root with hostPath mounts and no ServiceAccount token;
+the namespace is chosen with `--namespace` at install time.
+
 ## Configuration
 
-Configured entirely via environment variables (see
-[spec §5.4](docs/specification/05-implementation.md#54-configuration-schema)):
+Every runtime setting is a chart value under `config.*`; each maps to the
+environment variable of the same purpose (see
+[spec §5.4](docs/specification/05-implementation.md#54-configuration-schema)).
+Override with `--set config.<key>=<value>` or a values file.
 
-| Env var | Default | Meaning |
-|---------|---------|---------|
-| `WATCH_DIR` | `/var/log/pods` | Directory tree to watch |
-| `PRESERVE_DIR` | `/var/log/pods-preserved` | Where hardlinks are created |
-| `CLEANUP_INTERVAL_SEC` | `60` | Cleanup loop period |
-| `CLEANUP_MAX_AGE_MIN` | `5` | Age threshold for non-`.gz` orphans |
-| `CLEANUP_GZ_MAX_AGE_MIN` | `60` | Age threshold for `.gz` orphans |
-| `RESYNC_INTERVAL_SEC` | `30` | Periodic full-resync period |
-| `NAMESPACE_FILTER` | (empty = all) | Comma-separated namespace glob patterns |
-| `LOG_LEVEL` | `info` | `debug` or `info` |
-| `METRICS_PORT` | `9113` | Prometheus metrics port |
-| `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB glob; empty disables DB-aware cleanup |
+| Value | Default | Meaning |
+|-------|---------|---------|
+| `config.watchDir` | `/var/log/pods` | Directory tree to watch |
+| `config.preserveDir` | `/var/log/pods-preserved` | Where hardlinks are created |
+| `config.cleanupIntervalSec` | `60` | Cleanup loop period |
+| `config.cleanupMaxAgeMin` | `5` | Age threshold for non-`.gz` orphans |
+| `config.cleanupGzMaxAgeMin` | `60` | Age threshold for `.gz` orphans |
+| `config.resyncIntervalSec` | `30` | Periodic full-resync period |
+| `config.namespaceFilter` | `""` (all) | Comma-separated namespace glob patterns |
+| `config.logLevel` | `info` | `debug` or `info` |
+| `config.metricsPort` | `9113` | Prometheus metrics port |
+| `config.preservedLogDBGlob` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB glob; empty disables DB-aware cleanup |
+
+Other values — `image.repository`/`image.tag`, `hostPaths.*`, `resources`,
+`tolerations`, and `prometheusScrape` — are documented in
+[`charts/pod-log-preserver/values.yaml`](charts/pod-log-preserver/values.yaml).
 
 ## Metrics
 
-A Prometheus endpoint on `METRICS_PORT` at `/metrics` exposes
-`pod_log_preserver_preserved_files`, `..._orphaned_files`,
-`..._preserved_bytes`, `..._hardlinks_created_total`,
-`..._orphans_removed_total`, `..._db_confirmed_removed_total`, and
-`..._fluentbit_db_errors_total`. See
+A Prometheus endpoint on `METRICS_PORT` (default `9113`) at `/metrics`; the
+chart enables annotation-based scraping by default. See
 [spec §4.2](docs/specification/04-operations.md#42-observability).
+
+| Metric | Type | Meaning |
+|--------|------|---------|
+| `pod_log_preserver_preserved_files` | gauge | Files currently in the preserve directory |
+| `pod_log_preserver_orphaned_files` | gauge | Preserved files with link count 1 |
+| `pod_log_preserver_preserved_bytes` | gauge | Total bytes under the preserve directory |
+| `pod_log_preserver_hardlinks_created_total` | counter | Hardlinks created |
+| `pod_log_preserver_orphans_removed_total` | counter | Orphaned files removed |
+| `pod_log_preserver_db_confirmed_removed_total` | counter | Orphans removed after a tail DB confirmed a full read |
+| `pod_log_preserver_fluentbit_db_errors_total` | counter | Tail DB read errors |
 
 ## Requirements / Caveats
 
@@ -66,6 +80,8 @@ A Prometheus endpoint on `METRICS_PORT` at `/metrics` exposes
   filesystem (hardlinks cannot cross filesystems); a startup test enforces this.
 - **Root required**: reading kubelet-owned logs and creating hardlinks need
   uid 0 — the distroless `nonroot` tag is not usable.
+- **hostPath mounts**: the node's `/var/log` (rw) and the fluent-bit DB directory
+  (e.g. `/var/lib/fluent-bit`, rw) are mounted from the host.
 - **Tail DB is read-only but rw-mounted**: fluent-bit uses WAL, and a WAL reader
   must register in the `-shm` index, which needs write access to the DB
   directory.
