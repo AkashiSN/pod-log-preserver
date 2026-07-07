@@ -106,6 +106,31 @@ func TestCleanupRemovesDBConfirmedOrphan(t *testing.T) {
 	}
 }
 
+// TestCleanupRemovesDBConfirmedActiveSnapshot removes an orphaned active-log
+// snapshot (preserved as 0.log.<UnixNano>, which matches no rotated pattern) the
+// moment a tail DB confirms a full read. This is the common path: kubelet
+// rotates the active log's inode, inode dedup means the only preserved link is
+// the active snapshot, and confirmation-first must still apply to it.
+func TestCleanupRemovesDBConfirmedActiveSnapshot(t *testing.T) {
+	k, preserve := newCleanupKeeper(t)
+	rel := filepath.Join("ns_pod_uid", "c", "0.log.1720350000000000000")
+	path := filepath.Join(preserve, rel)
+	mkfile(t, path, "0123456789") // size 10, orphan
+	ino := inodeOfPath(t, path)
+
+	dbs := []map[uint64]dbEntry{
+		{ino: {offset: 10, name: "/var/log/pods-preserved/" + filepath.ToSlash(rel)}},
+	}
+	k.cleanupOrphans(dbs, time.Now()) // mtime is now: only the DB can confirm it
+
+	if exists(path) {
+		t.Error("db-confirmed active-snapshot orphan was not removed")
+	}
+	if got := k.m.DBConfirmedRemoved.Load(); got != 1 {
+		t.Errorf("DBConfirmedRemoved = %d, want 1", got)
+	}
+}
+
 // TestCleanupKeepsUnconfirmedRecentOrphan keeps an orphan that no DB confirms
 // and that is younger than the age threshold.
 func TestCleanupKeepsUnconfirmedRecentOrphan(t *testing.T) {

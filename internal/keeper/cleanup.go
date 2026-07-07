@@ -74,22 +74,25 @@ func (k *Keeper) cleanupOrphans(dbs []map[uint64]dbEntry, now time.Time) {
 }
 
 // tryRemoveOrphan removes an orphaned preserved file when it is finished, and
-// reports whether it did. A rotated or compressed log is removed the instant a
-// tail DB confirms fluent-bit read it fully (confirmation-first); any orphan is
-// otherwise removed once older than its age threshold (age-second). A file no
-// DB has finished and that is still young is kept.
+// reports whether it did. Any orphan is removed the instant a tail DB confirms
+// fluent-bit read it fully (confirmation-first) and is otherwise removed once
+// older than its age threshold (age-second). A file no DB has finished and that
+// is still young is kept.
+//
+// The DB check is attempted for every orphan, not just rotated/compressed
+// names: an active log is preserved as a snapshot (0.log.<UnixNano>) whose only
+// preserved link survives kubelet's rotation via inode dedup, so it too must be
+// confirmable. The DB predicate anchors by preserve-relative path and requires
+// offset >= size, so a name that is not tailed simply falls through to age.
 func (k *Keeper) tryRemoveOrphan(path string, info os.FileInfo, dbs []map[uint64]dbEntry, now time.Time) bool {
-	name := filepath.Base(path)
-	if rotatedLogRe.MatchString(name) || compressedLogRe.MatchString(name) {
-		if ino, ok := inodeOf(info); ok {
-			if rel, err := filepath.Rel(k.cfg.PreserveDir, path); err == nil {
-				if dbConfirmedConsumed(dbs, ino, filepath.ToSlash(rel), info.Size()) {
-					if k.removeOrphan(path) {
-						k.m.DBConfirmedRemoved.Add(1)
-						return true
-					}
-					return false
+	if ino, ok := inodeOf(info); ok {
+		if rel, err := filepath.Rel(k.cfg.PreserveDir, path); err == nil {
+			if dbConfirmedConsumed(dbs, ino, filepath.ToSlash(rel), info.Size()) {
+				if k.removeOrphan(path) {
+					k.m.DBConfirmedRemoved.Add(1)
+					return true
 				}
+				return false
 			}
 		}
 	}
