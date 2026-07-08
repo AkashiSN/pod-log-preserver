@@ -14,8 +14,10 @@ on:
     tags:
       - 'v*'
 
+# packages: write -> push the image and OCI chart to GHCR;
+# contents: write -> create the GitHub Release.
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -55,10 +57,13 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          # The tag keeps its leading "v" to match the embedded VERSION.
+          # The tag keeps its leading "v" to match the embedded VERSION. The
+          # `latest` line is skipped for a hyphenated prerelease tag (e.g.
+          # v0.5.0-rc.1), where the expression yields an empty line that
+          # build-push-action ignores — so a prerelease never overwrites latest.
           tags: |
             ${{ env.IMAGE }}:${{ github.ref_name }}
-            ${{ env.IMAGE }}:latest
+            ${{ !contains(github.ref_name, '-') && format('{0}:latest', env.IMAGE) || '' }}
           # A plain multi-arch manifest (no provenance/SBOM attestation index),
           # which is what the DaemonSet pulls.
           provenance: false
@@ -95,3 +100,31 @@ jobs:
           helm push \
             "pod-log-preserver-${{ steps.version.outputs.chart_version }}.tgz" \
             "${{ env.CHART_REPO }}"
+
+      - name: Upload packaged chart artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chart-tgz
+          path: pod-log-preserver-${{ steps.version.outputs.chart_version }}.tgz
+
+  release:
+    needs: chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged chart
+        uses: actions/download-artifact@v4
+        with:
+          name: chart-tgz
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          # Attach the packaged chart so consumers can grab the .tgz directly.
+          files: dist/*.tgz
+          # A hyphenated SemVer tag (e.g. v0.5.0-rc.1, -beta, -alpha) is marked a
+          # prerelease so it does not surface as "Latest"; GA tags (v0.5.0)
+          # publish normally. Mirrors the image job, which skips `latest` for the
+          # same hyphen-bearing refs.
+          prerelease: ${{ contains(github.ref_name, '-') }}
