@@ -17,6 +17,20 @@ log into a preserve directory on the same filesystem, keeping the bytes alive
 after the kubelet deletes the original. A cleanup loop reads the log agent's
 (fluent-bit) tail DB **read-only** and deletes a preserved file only once the
 agent has read it fully; files not yet confirmed fall back to an age threshold.
+
+```mermaid
+flowchart TD
+    kubelet[kubelet] -->|"① writes &amp; rotates"| pods["/var/log/pods"]
+    plp["pod-log-preserver"]
+    pods -->|"② watched via inotify"| plp
+    plp -->|"③ hardlink aside (same inode)"| preserved["/var/log/pods-preserved"]
+    agent["fluent-bit"] -->|"④ tails both trees"| pods
+    agent --> preserved
+    agent -->|"⑤ records read offset"| taildb[("tail DB")]
+    taildb -->|"⑥ read-only"| plp
+    plp -->|"⑦ delete once fully read"| preserved
+```
+
 See the [specification](docs/specification/) for the full design.
 
 ## Install (Helm)

@@ -29,15 +29,46 @@ shutdown via a context:
 A metrics HTTP server runs alongside. SIGTERM/SIGINT cancels the context and
 closes the inotify fd to unblock the event loop for a clean shutdown.
 
+```mermaid
+flowchart TD
+    subgraph proc["pod-log-preserver process"]
+        direction TB
+        event["Event loop<br/>(inotify watch tree)"]
+        resync["Periodic resync<br/>(full walk)"]
+        cleanup["Cleanup loop<br/>(orphan removal)"]
+        metrics["Metrics HTTP server<br/>/metrics"]
+        state[("shared counters")]
+    end
+    event & resync -->|hardlink| pres["/var/log/pods-preserved"]
+    cleanup -->|"read-only"| taildb[("tail DB")]
+    cleanup -->|delete orphans| pres
+    event & resync & cleanup & metrics --> state
+    sig["SIGTERM / SIGINT"] -.->|cancel context| proc
+```
+
 ## 5.2 Startup sequence
 
 1. Load configuration from environment variables (§5.4).
 2. Create the preserve directory; run the **hardlink validation test** (§4.1)
    against the pod's own container log — fail fast if it cannot hardlink.
-3. Initial sync: walk the watch directory and hardlink all existing matching
+3. Bind the metrics listener synchronously — fail fast if `METRICS_PORT` is
+   already in use — and start serving `/metrics`.
+4. Initial sync: walk the watch directory and hardlink all existing matching
    logs.
-4. Establish the recursive inotify watch tree.
-5. Start the metrics server and the resync/cleanup loops; enter the event loop.
+5. Establish the recursive inotify watch tree.
+6. Start the resync and cleanup loops; enter the event loop.
+
+```mermaid
+flowchart LR
+    a["Load config"] --> b["Create preserve dir<br/>+ hardlink test"]
+    b -->|fail| x["exit (fail-fast)"]
+    b -->|"ok / skip"| m["Bind metrics<br/>listener"]
+    m -->|"port in use"| x
+    m --> c["Initial sync"]
+    c --> d["inotify watch tree"]
+    d --> e["Start resync<br/>+ cleanup loops"]
+    e --> f["Event loop"]
+```
 
 ## 5.3 Tail DB read
 
