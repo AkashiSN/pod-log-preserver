@@ -9,6 +9,7 @@ root="$(cd "$here/../../.." && pwd)"
 cluster="${E2E_KIND_CLUSTER:-plp-e2e}"
 image="${E2E_IMAGE:-pod-log-preserver:e2e}"
 ns="${E2E_NS:-plp-e2e}"
+sys_ns="${E2E_SYS_NS:-default}"
 release="${E2E_RELEASE:-pod-log-preserver}"
 
 cleanup() {
@@ -24,12 +25,13 @@ kind load docker-image "$image" --name "$cluster"
 # Install the chart with the loaded image. repo:tag are split from $image.
 repo="${image%:*}"; tag="${image##*:}"
 helm install "$release" "$root/charts/pod-log-preserver" \
+  --namespace "$sys_ns" \
   --set "image.repository=${repo}" \
   --set "image.tag=${tag}" \
   --set "image.pullPolicy=Never" \
   --wait --timeout 180s
 
-kubectl rollout status "daemonset/${release}" --timeout=180s
+kubectl -n "$sys_ns" rollout status "daemonset/${release}" --timeout=180s
 
 kubectl create namespace "$ns" 2>/dev/null || true
-E2E_NS="$ns" E2E_RELEASE="$release" bash "$here/verify.sh"
+E2E_NS="$ns" E2E_RELEASE="$release" E2E_SYS_NS="$sys_ns" bash "$here/verify.sh"
