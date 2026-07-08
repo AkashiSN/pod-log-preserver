@@ -51,8 +51,11 @@ flowchart TD
 1. Load configuration from environment variables (§5.4); **fail fast** if a
    numeric value is out of range (a non-positive interval or age, or a
    `METRICS_PORT` outside `1..65535`), reporting every offending key at once.
-2. Create the preserve directory; run the **hardlink validation test** (§4.1)
-   against the pod's own container log — fail fast if it cannot hardlink.
+2. Create the preserve directory; run the deterministic **hardlink validation
+   test** (§4.1) — confirm the watch and preserve directories share a filesystem
+   (matching `st_dev`) and that a throwaway probe hardlink inside the preserve
+   directory succeeds — and fail fast otherwise. The test depends on neither pod
+   identity nor any pre-existing log, and writes nothing into the watch tree.
 3. Bind the metrics listener synchronously — fail fast if `METRICS_PORT` is
    already in use — and start serving `/metrics`.
 4. Initial sync: walk the watch directory and hardlink all existing matching
@@ -64,7 +67,7 @@ flowchart TD
 flowchart LR
     a["Load config"] --> b["Create preserve dir<br/>+ hardlink test"]
     b -->|fail| x["exit (fail-fast)"]
-    b -->|"ok / skip"| m["Bind metrics<br/>listener"]
+    b -->|ok| m["Bind metrics<br/>listener"]
     m -->|"port in use"| x
     m --> c["Initial sync"]
     c --> d["inotify watch tree"]
@@ -98,14 +101,6 @@ All configuration is via environment variables:
 | `LOG_LEVEL` | `info` | `debug` or `info` |
 | `METRICS_PORT` | `9113` | Prometheus metrics port |
 | `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB glob; empty disables DB-aware cleanup |
-| `POD_NAMESPACE` | (empty) | This pod's namespace (downward API); locates the pod's own container log for the startup hardlink test |
-| `POD_NAME` | (empty) | This pod's name (downward API) |
-| `POD_UID` | (empty) | This pod's UID (downward API) |
-
-`POD_NAMESPACE`/`POD_NAME`/`POD_UID` are injected via the Kubernetes downward
-API (not the API server). Together they locate the pod's own container log under
-`WATCH_DIR/<POD_NAMESPACE>_<POD_NAME>_<POD_UID>/` for the §5.2 startup hardlink
-test. When any is unset, the test warns and skips instead of failing.
 
 The four interval/age values (`CLEANUP_INTERVAL_SEC`, `CLEANUP_MAX_AGE_MIN`,
 `CLEANUP_GZ_MAX_AGE_MIN`, `RESYNC_INTERVAL_SEC`) must be **positive integers**

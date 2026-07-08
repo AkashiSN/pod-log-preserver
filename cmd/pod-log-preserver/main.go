@@ -48,11 +48,6 @@ func main() {
 	}
 	logging.Info(cfg, "LOG_LEVEL=%s", cfg.LogLevel)
 	logging.Info(cfg, "METRICS_PORT=%d", cfg.MetricsPort)
-	if cfg.PodNamespace != "" || cfg.PodName != "" || cfg.PodUID != "" {
-		logging.Info(cfg, "POD=%s/%s (uid %s)", cfg.PodNamespace, cfg.PodName, cfg.PodUID)
-	} else {
-		logging.Info(cfg, "POD=(downward API not injected)")
-	}
 
 	if err := run(cfg); err != nil {
 		log.Fatalf("[ERROR] %v", err)
@@ -73,18 +68,12 @@ func run(cfg config.Config) error {
 
 	m := &metrics.Metrics{}
 
-	// Fail fast if the watch and preserve dirs can't hardlink (spec §4.1 / §5.2);
-	// this also creates the preserve directory. A missing own container log warns
-	// and skips rather than failing.
-	res, err := validate.ValidateFilesystem(cfg.WatchDir, cfg.PreserveDir, cfg.PodNamespace, cfg.PodName, cfg.PodUID)
-	if err != nil {
+	// Fail fast if the watch and preserve dirs are not on the same hardlink-capable
+	// filesystem (spec §4.1 / §5.2); this also creates the preserve directory.
+	if err := validate.ValidateFilesystem(cfg.WatchDir, cfg.PreserveDir); err != nil {
 		return err
 	}
-	if res.Skipped {
-		logging.Warn("hardlink validation skipped: %s", res.Reason)
-	} else {
-		logging.Info(cfg, "hardlink validation passed against own log %s", res.TestedLog)
-	}
+	logging.Info(cfg, "hardlink validation passed (%s and %s share a hardlink-capable filesystem)", cfg.WatchDir, cfg.PreserveDir)
 
 	k, err := keeper.New(cfg, m)
 	if err != nil {

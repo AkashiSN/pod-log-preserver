@@ -41,7 +41,7 @@ flowchart TD
 ## 5.2 起動シーケンス
 
 1. 環境変数から設定をロードする（§5.4）。数値が範囲外の場合（非正の interval / age、または `1..65535` 外の `METRICS_PORT`）は **早期に失敗** し、該当するキーをすべてまとめて報告する。
-2. 保全ディレクトリを作成し、Pod 自身のコンテナログに対して **ハードリンク検証テスト**（§4.1）を実行する。ハードリンクできない場合は早期に失敗する。
+2. 保全ディレクトリを作成し、決定的な **ハードリンク検証テスト**（§4.1）を実行する。watch ディレクトリと保全ディレクトリが同一ファイルシステム上にあること（`st_dev` の一致）と、保全ディレクトリ内での使い捨て probe ハードリンクが成功することを確認し、いずれかが満たされなければ早期に失敗する。このテストは Pod identity にも既存ログの有無にも依存せず、watch tree には一切書き込まない。
 3. メトリクス listener を同期的にバインドし（`METRICS_PORT` が使用中なら早期に失敗する）、`/metrics` の提供を開始する。
 4. 初期同期: watch ディレクトリを walk し、既存の一致するログをすべてハードリンクする。
 5. 再帰的な inotify の watch tree を確立する。
@@ -51,7 +51,7 @@ flowchart TD
 flowchart LR
     a["設定ロード"] --> b["保全ディレクトリ作成<br/>+ ハードリンクテスト"]
     b -->|失敗| x["終了（fail-fast）"]
-    b -->|"成功 / スキップ"| m["メトリクス listener<br/>バインド"]
+    b -->|成功| m["メトリクス listener<br/>バインド"]
     m -->|"ポート使用中"| x
     m --> c["初期同期"]
     c --> d["inotify watch tree"]
@@ -79,14 +79,6 @@ flowchart LR
 | `LOG_LEVEL` | `info` | `debug` または `info` |
 | `METRICS_PORT` | `9113` | Prometheus メトリクスのポート |
 | `PRESERVED_LOG_DB_GLOB` | `/var/lib/fluent-bit/flb_kube*.db` | Tail DB のグロブ。空にすると DB を利用したクリーンアップを無効化する |
-| `POD_NAMESPACE` | （空） | この Pod の namespace（downward API）。起動時ハードリンクテスト用に Pod 自身のコンテナログを特定する |
-| `POD_NAME` | （空） | この Pod の名前（downward API） |
-| `POD_UID` | （空） | この Pod の UID（downward API） |
-
-`POD_NAMESPACE`/`POD_NAME`/`POD_UID` は Kubernetes の downward API（API サーバー
-ではない）経由で注入される。これらを組み合わせて `WATCH_DIR/<POD_NAMESPACE>_<POD_NAME>_<POD_UID>/`
-配下にある Pod 自身のコンテナログを特定し、§5.2 の起動時ハードリンクテストに用いる。
-いずれかが未設定の場合、テストは失敗せず警告してスキップする。
 
 4 つの interval / age 値（`CLEANUP_INTERVAL_SEC`・`CLEANUP_MAX_AGE_MIN`・
 `CLEANUP_GZ_MAX_AGE_MIN`・`RESYNC_INTERVAL_SEC`）は **正の整数** でなければならない
