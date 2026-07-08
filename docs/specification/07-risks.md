@@ -18,6 +18,10 @@
 - **To re-validate for this release:** the pure-Go `modernc.org/sqlite` driver
   reads a real fluent-bit WAL tail DB read-only with results identical to the
   previous CGO driver — verified against a copied real DB during implementation.
+- **Automated re-validation:** the hybrid e2e harness (`test/e2e/`) exercises the
+  full preserve → fluent-bit-confirms → cleanup loop against the shipped image and
+  a real fluent-bit WAL tail DB on every CI run, replacing the one-time manual
+  check above with a continuous gate.
 
 ## 7.3 Open questions
 
