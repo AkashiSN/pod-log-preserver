@@ -73,13 +73,76 @@ func TestReadTailDBReproducesRows(t *testing.T) {
 		t.Fatalf("got %d rows, want %d", len(got), len(rows))
 	}
 	for i, ino := range inodes {
-		e, ok := got[ino]
-		if !ok {
-			t.Fatalf("inode %d missing from result", ino)
+		es, ok := got[ino]
+		if !ok || len(es) != 1 {
+			t.Fatalf("inode %d = %d rows, want exactly 1", ino, len(es))
 		}
+		e := es[0]
 		if e.offset != rows[i].offset || e.name != rows[i].name {
 			t.Errorf("inode %d = {%d, %q}, want {%d, %q}", ino, e.offset, e.name, rows[i].offset, rows[i].name)
 		}
+	}
+}
+
+// TestReadTailDBKeepsDuplicateInodeRows asserts that when one tail DB holds two
+// rows for the same inode — as happens when a single fluent-bit input tails
+// both the live tree and the preserved tree, and a preserved hardlink shares
+// its original's inode — readTailDB keeps both rows instead of letting the
+// unordered SELECT's last row overwrite the other.
+func TestReadTailDBKeepsDuplicateInodeRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "flb_kube.db")
+	const shared = uint64(500)
+	rows := []dbEntry{
+		{offset: 4096, name: "/var/log/pods/ns_pod_uid/c/0.log"},
+		{offset: 4096, name: "/var/log/pods-preserved/ns_pod_uid/c/0.log.20240101-000000"},
+	}
+	buildTailDB(t, path, rows, []uint64{shared, shared})
+
+	got, err := readTailDB(path)
+	if err != nil {
+		t.Fatalf("readTailDB: %v", err)
+	}
+	if len(got[shared]) != 2 {
+		t.Fatalf("inode %d has %d rows, want 2 (duplicate rows must not overwrite)", shared, len(got[shared]))
+	}
+	names := map[string]bool{}
+	for _, e := range got[shared] {
+		names[e.name] = true
+	}
+	for _, r := range rows {
+		if !names[r.name] {
+			t.Errorf("row %q missing from readTailDB result", r.name)
+		}
+	}
+}
+
+// TestDBConfirmedConsumedDuplicateInode covers the confirmation predicate when
+// one DB holds two rows on the same inode: the row for the pods/ tree does not
+// match the preserved-path anchor and must be ignored, while the preserved-tree
+// row confirms. This must hold regardless of which row the SELECT yields last,
+// so both insertion orders are exercised.
+func TestDBConfirmedConsumedDuplicateInode(t *testing.T) {
+	const (
+		inode   = uint64(500)
+		relPath = "ns_pod_uid/c/0.log.20240101-000000"
+		size    = int64(4096)
+	)
+	preserved := dbEntry{offset: 4096, name: "/var/log/pods-preserved/" + relPath}
+	live := dbEntry{offset: 4096, name: "/var/log/pods/ns_pod_uid/c/0.log"}
+
+	for _, order := range []struct {
+		name string
+		rows []dbEntry
+	}{
+		{"preserved row last", []dbEntry{live, preserved}},
+		{"preserved row first", []dbEntry{preserved, live}},
+	} {
+		t.Run(order.name, func(t *testing.T) {
+			dbs := []map[uint64][]dbEntry{{inode: order.rows}}
+			if !dbConfirmedConsumed(dbs, inode, relPath, size) {
+				t.Error("dbConfirmedConsumed = false, want true (preserved row confirms regardless of order)")
+			}
+		})
 	}
 }
 
@@ -142,50 +205,50 @@ func TestDBConfirmedConsumed(t *testing.T) {
 
 	tests := []struct {
 		name string
-		dbs  []map[uint64]dbEntry
+		dbs  []map[uint64][]dbEntry
 		want bool
 	}{
 		{
 			name: "absent in all DBs is not confirmed",
-			dbs: []map[uint64]dbEntry{
-				{999: {offset: 100, name: "/other/file"}},
+			dbs: []map[uint64][]dbEntry{
+				{999: {{offset: 100, name: "/other/file"}}},
 			},
 			want: false,
 		},
 		{
 			name: "inode collision with mismatched name is not confirmed",
-			dbs: []map[uint64]dbEntry{
-				{inode: {offset: 100, name: "/var/log/pods-preserved/other_pod/c/0.log.20240101-000000"}},
+			dbs: []map[uint64][]dbEntry{
+				{inode: {{offset: 100, name: "/var/log/pods-preserved/other_pod/c/0.log.20240101-000000"}}},
 			},
 			want: false,
 		},
 		{
 			name: "offset below size is not confirmed",
-			dbs: []map[uint64]dbEntry{
-				{inode: {offset: 99, name: fullName}},
+			dbs: []map[uint64][]dbEntry{
+				{inode: {{offset: 99, name: fullName}}},
 			},
 			want: false,
 		},
 		{
 			name: "offset at size in the only matching DB is confirmed",
-			dbs: []map[uint64]dbEntry{
-				{inode: {offset: 100, name: fullName}},
+			dbs: []map[uint64][]dbEntry{
+				{inode: {{offset: 100, name: fullName}}},
 			},
 			want: true,
 		},
 		{
 			name: "one DB finished, another has no row, is confirmed",
-			dbs: []map[uint64]dbEntry{
-				{inode: {offset: 120, name: fullName}},
-				{999: {offset: 0, name: "/unrelated"}},
+			dbs: []map[uint64][]dbEntry{
+				{inode: {{offset: 120, name: fullName}}},
+				{999: {{offset: 0, name: "/unrelated"}}},
 			},
 			want: true,
 		},
 		{
 			name: "one DB finished, another matching DB not finished, is not confirmed",
-			dbs: []map[uint64]dbEntry{
-				{inode: {offset: 100, name: fullName}},
-				{inode: {offset: 50, name: fullName}},
+			dbs: []map[uint64][]dbEntry{
+				{inode: {{offset: 100, name: fullName}}},
+				{inode: {{offset: 50, name: fullName}}},
 			},
 			want: false,
 		},

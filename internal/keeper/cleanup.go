@@ -45,7 +45,7 @@ func (k *Keeper) runCleanupCycle() {
 //
 // The preserved-files, preserved-bytes, and orphaned-files gauges are set to
 // the post-cycle counts (files that survive this pass).
-func (k *Keeper) cleanupOrphans(dbs []map[uint64]dbEntry, now time.Time) {
+func (k *Keeper) cleanupOrphans(dbs []map[uint64][]dbEntry, now time.Time) {
 	var files, bytes, orphans int64
 	_ = filepath.WalkDir(k.cfg.PreserveDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -84,7 +84,7 @@ func (k *Keeper) cleanupOrphans(dbs []map[uint64]dbEntry, now time.Time) {
 // preserved link survives kubelet's rotation via inode dedup, so it too must be
 // confirmable. The DB predicate anchors by preserve-relative path and requires
 // offset >= size, so a name that is not tailed simply falls through to age.
-func (k *Keeper) tryRemoveOrphan(path string, info os.FileInfo, dbs []map[uint64]dbEntry, now time.Time) bool {
+func (k *Keeper) tryRemoveOrphan(path string, info os.FileInfo, dbs []map[uint64][]dbEntry, now time.Time) bool {
 	if ino, ok := inodeOf(info); ok {
 		if rel, err := filepath.Rel(k.cfg.PreserveDir, path); err == nil {
 			if dbConfirmedConsumed(dbs, ino, filepath.ToSlash(rel), info.Size()) {

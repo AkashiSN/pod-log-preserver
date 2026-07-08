@@ -89,8 +89,8 @@ func TestCleanupRemovesDBConfirmedOrphan(t *testing.T) {
 	mkfile(t, path, "0123456789") // size 10, Nlink == 1 (orphan)
 	ino := inodeOfPath(t, path)
 
-	dbs := []map[uint64]dbEntry{
-		{ino: {offset: 10, name: "/var/log/pods-preserved/" + filepath.ToSlash(rel)}},
+	dbs := []map[uint64][]dbEntry{
+		{ino: {{offset: 10, name: "/var/log/pods-preserved/" + filepath.ToSlash(rel)}}},
 	}
 	// mtime is "now" so age-based cleanup would NOT fire; only DB confirms it.
 	k.cleanupOrphans(dbs, time.Now())
@@ -118,8 +118,8 @@ func TestCleanupRemovesDBConfirmedActiveSnapshot(t *testing.T) {
 	mkfile(t, path, "0123456789") // size 10, orphan
 	ino := inodeOfPath(t, path)
 
-	dbs := []map[uint64]dbEntry{
-		{ino: {offset: 10, name: "/var/log/pods-preserved/" + filepath.ToSlash(rel)}},
+	dbs := []map[uint64][]dbEntry{
+		{ino: {{offset: 10, name: "/var/log/pods-preserved/" + filepath.ToSlash(rel)}}},
 	}
 	k.cleanupOrphans(dbs, time.Now()) // mtime is now: only the DB can confirm it
 
@@ -140,8 +140,8 @@ func TestCleanupKeepsUnconfirmedRecentOrphan(t *testing.T) {
 	ino := inodeOfPath(t, path)
 
 	// offset below size => not confirmed.
-	dbs := []map[uint64]dbEntry{
-		{ino: {offset: 3, name: "/var/log/pods-preserved/ns_pod_uid/c/0.log.20240101-000000"}},
+	dbs := []map[uint64][]dbEntry{
+		{ino: {{offset: 3, name: "/var/log/pods-preserved/ns_pod_uid/c/0.log.20240101-000000"}}},
 	}
 	k.cleanupOrphans(dbs, time.Now())
 

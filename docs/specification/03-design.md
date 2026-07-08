@@ -52,6 +52,12 @@ cycle, read-only). A file is **confirmed consumed** when:
 2. in every DB that has such a matching row, the recorded offset has reached the
    file's size.
 
+A single DB may record the same inode under more than one name — a preserved
+file is a hardlink, so an input tailing both the live and the preserved tree
+lists that inode twice (`…/pods/…/0.log` and `…/pods-preserved/…/0.log.<ts>`).
+Every row for the inode is considered, so the non-matching live-tree name is
+ignored and the preserved-tree name still confirms, regardless of row order.
+
 A confirmed file is deleted immediately, releasing the agent's file descriptor.
 
 **Multiple tail inputs:** a DB with no row for the file does not block deletion —
