@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -98,6 +99,34 @@ func TestReadTailDBIsReadOnly(t *testing.T) {
 	after := sha256File(t, path)
 	if before != after {
 		t.Errorf("readTailDB modified the DB file")
+	}
+}
+
+// TestTailDBDSNRejectsWrites proves the DSN readTailDB uses (mode=ro) actually
+// rejects writes, not just that readTailDB happens to issue no writes. It opens
+// a fixture with the exact same DSN construction (tailDBDSN, shared with the
+// implementation so the test cannot drift from it) and asserts an INSERT fails
+// with a read-only error. Removing mode=ro from the DSN turns this test red,
+// guarding the "read-only against fluent-bit's tail DB" architectural invariant.
+func TestTailDBDSNRejectsWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "flb_kube.db")
+	buildTailDB(t, path,
+		[]dbEntry{{offset: 5, name: "/p/ns_pod_uid/c/0.log.20240101-000000"}},
+		[]uint64{42},
+	)
+
+	db, err := sql.Open("sqlite", tailDBDSN(path))
+	if err != nil {
+		t.Fatalf("open read-only DSN: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	_, err = db.Exec("INSERT INTO in_tail_files (name, offset, inode) VALUES ('x', 0, 1)")
+	if err == nil {
+		t.Fatal("INSERT via the read-only DSN succeeded; the DSN is not read-only")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "readonly") {
+		t.Errorf("INSERT error = %v, want a read-only error", err)
 	}
 }
 

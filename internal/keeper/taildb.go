@@ -18,14 +18,25 @@ type dbEntry struct {
 	name   string
 }
 
+// tailDBDSN builds the SQLite DSN used to open a fluent-bit tail DB. It pins
+// mode=ro so the agent's rows are never written and a busy_timeout so a
+// concurrent writer does not immediately fail the read (spec §5.3,
+// architectural invariant: read-only against fluent-bit's tail DB). It is the
+// single source of the DSN string so a test can open the same connection the
+// implementation does and prove the read-only pin actually rejects writes.
+func tailDBDSN(path string) string {
+	return "file:" + path + "?mode=ro&_pragma=busy_timeout(5000)"
+}
+
 // readTailDB opens a fluent-bit in_tail SQLite tail DB read-only and returns a
-// map from inode to the recorded (offset, name). The DSN pins mode=ro and a
-// busy_timeout so the agent's rows are never written and a concurrent writer
-// does not immediately fail the read (spec §5.3, architectural invariant:
-// read-only against fluent-bit's tail DB). The pool is pinned to a single
-// connection so the read-only handle registers exactly once in the WAL index.
+// map from inode to the recorded (offset, name). The DSN (tailDBDSN) pins
+// mode=ro and a busy_timeout so the agent's rows are never written and a
+// concurrent writer does not immediately fail the read (spec §5.3,
+// architectural invariant: read-only against fluent-bit's tail DB). The pool is
+// pinned to a single connection so the read-only handle registers exactly once
+// in the WAL index.
 func readTailDB(path string) (map[uint64]dbEntry, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(5000)")
+	db, err := sql.Open("sqlite", tailDBDSN(path))
 	if err != nil {
 		return nil, err
 	}
