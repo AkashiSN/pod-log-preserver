@@ -21,7 +21,11 @@
 - **Automated re-validation:** the hybrid e2e harness (`test/e2e/`) exercises the
   full preserve → fluent-bit-confirms → cleanup loop against the shipped image and
   a real fluent-bit WAL tail DB on every CI run, replacing the one-time manual
-  check above with a continuous gate.
+  check above with a continuous gate. The harness pins a single fluent-bit
+  version (`3.1.9`); the tail-DB schema matrix that makes this generalize across
+  fluent-bit 1.x–5.x — and its safe fallback on an incompatible schema — is
+  stated in §5.3 and covered by a unit-test support matrix over each major's
+  schema.
 
 ## 7.3 Open questions
 

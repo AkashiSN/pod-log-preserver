@@ -46,6 +46,11 @@ config:
   namespaceFilter: ""
   logLevel: info
   metricsPort: 9113
+  # Glob for the fluent-bit tail DBs. DB-aware cleanup supports fluent-bit
+  # 1.x-5.x (e2e-validated against 3.1.9): only the in_tail_files
+  # inode/offset/name columns are read, and an unrecognized or incompatible DB
+  # safely degrades to age-based cleanup. Empty disables DB-aware cleanup. See
+  # spec §5.3 for the schema matrix.
   preservedLogDBGlob: /var/lib/fluent-bit/flb_kube*.db
 
 # Extra environment variables appended verbatim to the container (list of

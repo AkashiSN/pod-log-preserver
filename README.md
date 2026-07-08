@@ -102,6 +102,12 @@ chart enables annotation-based scraping by default. See
 - **Tail DB is read-only but rw-mounted**: fluent-bit uses WAL, and a WAL reader
   must register in the `-shm` index, which needs write access to the DB
   directory.
+- **fluent-bit versions**: DB-aware cleanup supports fluent-bit **1.x through
+  5.x** (e2e-validated against `3.1.9`). Only the `in_tail_files` table's
+  `inode`, `offset`, and `name` columns are read, so 5.x's added
+  `offset_marker*` columns are ignored and an unrecognized or incompatible DB
+  safely degrades to age-based cleanup. See the schema matrix in
+  [spec §5.3](docs/specification/05-implementation.md).
 
 See [spec §4](docs/specification/04-operations.md) for details.
 
