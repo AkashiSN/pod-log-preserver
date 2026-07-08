@@ -146,7 +146,10 @@ func startFluentBit(t *testing.T, work string) {
 		HostConfigModifier: func(hc *container.HostConfig) {
 			hc.Binds = []string{work + ":/work", conf + ":/work/fluent-bit.conf:ro"}
 		},
-		WaitingFor: wait.ForLog("[engine] started").WithStartupTimeout(30 * time.Second),
+		// fluent-bit 3.1.9 never logs "[engine] started" (that message was
+		// removed upstream); the null output worker starting is the last line
+		// of its startup sequence, so wait on that instead.
+		WaitingFor: wait.ForLog("[output:null:null.0] worker #0 started").WithStartupTimeout(30 * time.Second),
 	}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req, Started: true,
