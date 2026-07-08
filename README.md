@@ -1,5 +1,8 @@
 # pod-log-preserver
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-v0.5.0_in_development_(pre--1.0)-orange.svg)](docs/specification/)
+
 Preserve kubelet-rotated pod logs on EKS Auto Mode until a log agent has
 collected them — then reclaim the disk automatically.
 
