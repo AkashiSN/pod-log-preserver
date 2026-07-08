@@ -8,3 +8,6 @@
 *.orig
 .vscode/
 .idea/
+# helm-unittest fixtures — assert rendered content and schema rejections in CI;
+# not part of the released chart package.
+tests/

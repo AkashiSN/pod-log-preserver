@@ -114,3 +114,9 @@ would panic at runtime — and `METRICS_PORT` must be in `1..65535`. Load-time
 validation (§5.2 step 1) rejects out-of-range values with a clear fail-fast
 error naming each offending key, rather than deferring the failure to a ticker
 panic.
+
+The Helm chart mirrors these constraints in
+`charts/pod-log-preserver/values.schema.json`, which Helm validates at
+template/install time, so a misspelled key or an out-of-range value is rejected
+before it reaches the cluster — a fast first line of defense ahead of the
+binary's load-time validation.
