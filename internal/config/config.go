@@ -25,6 +25,13 @@ type Config struct {
 	// preserved log tree. Empty disables DB-aware cleanup. The default matches
 	// flb_kube*.db so DBs of other fluent-bit inputs are never read by mistake.
 	PreservedLogDBGlob string
+
+	// invalidInts collects the parse errors for integer env vars that were set
+	// to a non-numeric value. Load records them here (the field itself falls
+	// back to its default so startup logging stays coherent) and Validate
+	// surfaces them, so a typo like CLEANUP_INTERVAL_SEC=5m is a fail-fast
+	// naming the key rather than a silently ignored setting (spec §5.4).
+	invalidInts []error
 }
 
 // configEnvKeys lists every environment variable Load reads. It exists so
@@ -43,19 +50,31 @@ var configEnvKeys = []string{
 }
 
 // Load reads configuration from the environment, applying the documented
-// default when a key is unset, empty, or (for integers) non-numeric.
+// default when a key is unset or empty. A key set to a non-numeric integer
+// still falls back to its default here (so startup logging is coherent) but is
+// recorded so Validate can reject it — a typo is a fail-fast, not a silently
+// ignored setting (spec §5.4).
 func Load() Config {
+	var invalid []error
+	intOf := func(key string, fallback int) int {
+		n, err := envInt(key, fallback)
+		if err != nil {
+			invalid = append(invalid, err)
+		}
+		return n
+	}
 	cfg := Config{
 		WatchDir:           envStr("WATCH_DIR", "/var/log/pods"),
 		PreserveDir:        envStr("PRESERVE_DIR", "/var/log/pods-preserved"),
-		CleanupIntervalSec: envInt("CLEANUP_INTERVAL_SEC", 60),
-		CleanupMaxAgeMin:   envInt("CLEANUP_MAX_AGE_MIN", 5),
-		CleanupGzMaxAgeMin: envInt("CLEANUP_GZ_MAX_AGE_MIN", 60),
-		ResyncIntervalSec:  envInt("RESYNC_INTERVAL_SEC", 30),
+		CleanupIntervalSec: intOf("CLEANUP_INTERVAL_SEC", 60),
+		CleanupMaxAgeMin:   intOf("CLEANUP_MAX_AGE_MIN", 5),
+		CleanupGzMaxAgeMin: intOf("CLEANUP_GZ_MAX_AGE_MIN", 60),
+		ResyncIntervalSec:  intOf("RESYNC_INTERVAL_SEC", 30),
 		LogLevel:           envStr("LOG_LEVEL", "info"),
-		MetricsPort:        envInt("METRICS_PORT", 9113),
+		MetricsPort:        intOf("METRICS_PORT", 9113),
 		PreservedLogDBGlob: envStr("PRESERVED_LOG_DB_GLOB", "/var/lib/fluent-bit/flb_kube*.db"),
 	}
+	cfg.invalidInts = invalid
 
 	if filter := envStr("NAMESPACE_FILTER", ""); filter != "" {
 		for _, ns := range strings.Split(filter, ",") {
@@ -76,6 +95,10 @@ func Load() Config {
 // configuration is usable. Callers should treat a non-nil result as fatal.
 func (c Config) Validate() error {
 	var errs []error
+	// Non-numeric integer env values are rejected first, naming each key; the
+	// affected fields fell back to valid defaults, so they will not also trip
+	// the positive-integer checks below.
+	errs = append(errs, c.invalidInts...)
 	positive := func(key string, v int) {
 		if v <= 0 {
 			errs = append(errs, fmt.Errorf("%s must be a positive integer, got %d", key, v))
@@ -99,13 +122,18 @@ func envStr(key, fallback string) string {
 	return fallback
 }
 
-// envInt returns key parsed as an int, or fallback when it is unset, empty, or
-// not a valid integer.
-func envInt(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
+// envInt returns key parsed as an int, or fallback when it is unset or empty.
+// When the value is set but not a valid integer it returns fallback together
+// with an error naming the key and quoting the offending value, so the caller
+// can turn the typo into a fail-fast instead of a silent default.
+func envInt(key string, fallback int) (int, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
 	}
-	return fallback
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback, fmt.Errorf("%s must be an integer, got %q", key, v)
+	}
+	return n, nil
 }

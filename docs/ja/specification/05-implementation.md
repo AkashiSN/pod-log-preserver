@@ -40,7 +40,7 @@ flowchart TD
 
 ## 5.2 起動シーケンス
 
-1. 環境変数から設定をロードする（§5.4）。数値が範囲外の場合（非正の interval / age、または `1..65535` 外の `METRICS_PORT`）は **早期に失敗** し、該当するキーをすべてまとめて報告する。
+1. 環境変数から設定をロードする（§5.4）。整数値が非数値の場合（`CLEANUP_INTERVAL_SEC=5m` のようなタイポ）、または数値が範囲外の場合（非正の interval / age、または `1..65535` 外の `METRICS_PORT`）は **早期に失敗** し、該当するキーをすべてまとめて報告する。
 2. 保全ディレクトリを作成し、決定的な **ハードリンク検証テスト**（§4.1）を実行する。watch ディレクトリと保全ディレクトリが同一ファイルシステム上にあること（`st_dev` の一致）と、保全ディレクトリ内での使い捨て probe ハードリンクが成功することを確認し、いずれかが満たされなければ早期に失敗する。このテストは Pod identity にも既存ログの有無にも依存せず、watch tree には一切書き込まない。
 3. メトリクス listener を同期的にバインドし（`METRICS_PORT` が使用中なら早期に失敗する）、`/metrics` の提供を開始する。
 4. 初期同期: watch ディレクトリを walk し、既存の一致するログをすべてハードリンクする。
@@ -83,9 +83,10 @@ flowchart LR
 4 つの interval / age 値（`CLEANUP_INTERVAL_SEC`・`CLEANUP_MAX_AGE_MIN`・
 `CLEANUP_GZ_MAX_AGE_MIN`・`RESYNC_INTERVAL_SEC`）は **正の整数** でなければならない
 （`time.Ticker` / `time.Duration` の入力となり、非正の duration は実行時に panic するため）。
-また `METRICS_PORT` は `1..65535` の範囲でなければならない。ロード時の検証（§5.2 ステップ 1）が
-範囲外の値を、該当キーを明示した fail-fast エラーで拒否するため、ticker の panic として
-遅れて顕在化することはない。
+また `METRICS_PORT` は `1..65535` の範囲でなければならない。整数値をとるキー（`METRICS_PORT` を含む）は
+さらに **整数としてパースできる** 必要があり、設定されているが非数値の値は暗黙には無視されない。
+ロード時の検証（§5.2 ステップ 1）が非数値・範囲外の両方を、該当キーを明示した fail-fast エラーで
+拒否するため、タイポがデフォルト値に吸収されたり、ticker の panic として遅れて顕在化したりすることはない。
 
 Helm chart はこれらの制約を
 `charts/pod-log-preserver/values.schema.json` に反映しており、Helm が
