@@ -16,7 +16,7 @@ type Config struct {
 	CleanupMaxAgeMin   int
 	CleanupGzMaxAgeMin int
 	ResyncIntervalSec  int
-	NamespaceFilter    []string // nil = all namespaces; entries are glob patterns (e.g. "cdx-*")
+	NamespaceFilter    []string // nil = all namespaces; entries are glob patterns (e.g. "team-*")
 	LogLevel           string
 	MetricsPort        int
 	// PreservedLogDBGlob is the glob for the fluent-bit tail DBs that track the
