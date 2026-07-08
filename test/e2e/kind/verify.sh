@@ -14,7 +14,7 @@ cleanup_inspector() {
 trap cleanup_inspector EXIT
 
 # A workload that writes identifiable log lines.
-kubectl -n "$NS" run logger --image=busybox --restart=Never -- \
+kubectl -n "$NS" run logger --image=busybox:1.37 --restart=Never -- \
   sh -c 'for i in $(seq 1 50); do echo "plp-e2e-marker line $i"; done; sleep 3600'
 kubectl -n "$NS" wait --for=condition=Ready pod/logger --timeout=120s
 
