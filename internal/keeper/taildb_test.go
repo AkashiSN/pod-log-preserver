@@ -12,11 +12,13 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// tailDBBaselineSchema is fluent-bit's in_tail_files table for the versions
-// pod-log-preserver supports (2.x–3.x; the e2e harness pins 3.1.9). It is the
-// documented minimum schema the read path depends on — readTailDB reads only
-// the inode, offset, and name columns (spec §5.3) — kept in one place so the
-// fixtures below and the schema contract in the spec cannot drift apart.
+// tailDBBaselineSchema is fluent-bit's in_tail_files table as shipped by every
+// released 1.x–4.x major (identical across them; the e2e harness pins 3.1.9).
+// The 5.x series adds two columns on top of it — see tailDBSchemaWithMarkers.
+// It is the documented minimum schema the read path depends on — readTailDB
+// reads only the inode, offset, and name columns (spec §5.3) — kept in one
+// place so the fixtures below and the schema contract in the spec cannot drift
+// apart.
 const tailDBBaselineSchema = `CREATE TABLE in_tail_files (
 	id INTEGER PRIMARY KEY,
 	name TEXT NOT NULL,
