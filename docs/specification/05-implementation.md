@@ -48,7 +48,8 @@ flowchart TD
 
 ## 5.2 Startup sequence
 
-1. Load configuration from environment variables (§5.4); **fail fast** if a
+1. Load configuration from environment variables (§5.4); **fail fast** if an
+   integer value is non-numeric (a typo such as `CLEANUP_INTERVAL_SEC=5m`) or a
    numeric value is out of range (a non-positive interval or age, or a
    `METRICS_PORT` outside `1..65535`), reporting every offending key at once.
 2. Create the preserve directory; run the deterministic **hardlink validation
@@ -105,10 +106,12 @@ All configuration is via environment variables:
 The four interval/age values (`CLEANUP_INTERVAL_SEC`, `CLEANUP_MAX_AGE_MIN`,
 `CLEANUP_GZ_MAX_AGE_MIN`, `RESYNC_INTERVAL_SEC`) must be **positive integers**
 — they become `time.Ticker`/`time.Duration` inputs and a non-positive duration
-would panic at runtime — and `METRICS_PORT` must be in `1..65535`. Load-time
-validation (§5.2 step 1) rejects out-of-range values with a clear fail-fast
-error naming each offending key, rather than deferring the failure to a ticker
-panic.
+would panic at runtime — and `METRICS_PORT` must be in `1..65535`. Every
+integer-valued key (including `METRICS_PORT`) must also **parse as an integer**:
+a value that is set but non-numeric is not silently ignored. Load-time
+validation (§5.2 step 1) rejects both non-numeric and out-of-range values with a
+clear fail-fast error naming each offending key, rather than absorbing the typo
+into the default or deferring the failure to a ticker panic.
 
 The Helm chart mirrors these constraints in
 `charts/pod-log-preserver/values.schema.json`, which Helm validates at

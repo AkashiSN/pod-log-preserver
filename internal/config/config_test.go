@@ -65,13 +65,52 @@ func TestLoadConfigOverrides(t *testing.T) {
 	}
 }
 
-// TestLoadConfigInvalidIntFallsBack asserts a non-numeric int env value is
-// ignored in favor of the default rather than causing a startup error.
-func TestLoadConfigInvalidIntFallsBack(t *testing.T) {
-	t.Setenv("METRICS_PORT", "not-a-number")
+// TestNonNumericIntRejectedByValidate asserts a non-numeric integer env value is
+// a fail-fast at startup, naming the offending key — the same UX as the
+// out-of-range validation — rather than being silently absorbed into the
+// default. The field still carries the default so startup logging is coherent,
+// but Validate reports the parse failure.
+func TestNonNumericIntRejectedByValidate(t *testing.T) {
+	for _, k := range configEnvKeys {
+		t.Setenv(k, "")
+	}
+	t.Setenv("METRICS_PORT", "91l3") // typo, not an integer
+
 	cfg := Load()
 	if cfg.MetricsPort != 9113 {
-		t.Errorf("MetricsPort = %d, want default 9113 on invalid int", cfg.MetricsPort)
+		t.Errorf("MetricsPort = %d, want the default 9113 to remain for logging", cfg.MetricsPort)
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want a fail-fast error for the non-numeric METRICS_PORT")
+	}
+	if !strings.Contains(err.Error(), "METRICS_PORT") {
+		t.Errorf("Validate() error = %q, want it to name METRICS_PORT", err.Error())
+	}
+	if !strings.Contains(err.Error(), "91l3") {
+		t.Errorf("Validate() error = %q, want it to quote the offending value", err.Error())
+	}
+}
+
+// TestNonNumericIntsAccumulate asserts every non-numeric integer key is reported
+// together, matching the accumulate-all behavior of the range validation, and
+// that a non-numeric value does not also trip the positive-integer check (it
+// falls back to a valid default for that purpose).
+func TestNonNumericIntsAccumulate(t *testing.T) {
+	for _, k := range configEnvKeys {
+		t.Setenv(k, "")
+	}
+	t.Setenv("CLEANUP_INTERVAL_SEC", "5m")
+	t.Setenv("RESYNC_INTERVAL_SEC", "abc")
+
+	err := Load().Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want errors for both non-numeric keys")
+	}
+	for _, key := range []string{"CLEANUP_INTERVAL_SEC", "RESYNC_INTERVAL_SEC"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Errorf("error %q missing key %s", err.Error(), key)
+		}
 	}
 }
 
@@ -114,12 +153,20 @@ func TestEnvStrAndEnvInt(t *testing.T) {
 	}
 
 	t.Setenv("PLP_INT", "42")
-	if got := envInt("PLP_INT", 7); got != 42 {
-		t.Errorf("envInt(set) = %d, want 42", got)
+	if got, err := envInt("PLP_INT", 7); got != 42 || err != nil {
+		t.Errorf("envInt(set) = %d, %v, want 42, nil", got, err)
+	}
+	t.Setenv("PLP_INT", "")
+	if got, err := envInt("PLP_INT", 7); got != 7 || err != nil {
+		t.Errorf("envInt(empty) = %d, %v, want fallback 7, nil", got, err)
 	}
 	t.Setenv("PLP_INT", "nope")
-	if got := envInt("PLP_INT", 7); got != 7 {
+	got, err := envInt("PLP_INT", 7)
+	if got != 7 {
 		t.Errorf("envInt(invalid) = %d, want fallback 7", got)
+	}
+	if err == nil {
+		t.Error("envInt(invalid) err = nil, want a parse error naming the key")
 	}
 }
 
