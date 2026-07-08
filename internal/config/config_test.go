@@ -97,7 +97,7 @@ func TestNamespaceFilterParsing(t *testing.T) {
 		{"multiple", "a,b,c", []string{"a", "b", "c"}},
 		{"trims whitespace", " a , b ", []string{"a", "b"}},
 		{"skips empty segments", "a,,b,", []string{"a", "b"}},
-		{"glob pattern preserved", "cdx-*", []string{"cdx-*"}},
+		{"glob pattern preserved", "team-*", []string{"team-*"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
