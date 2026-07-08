@@ -1,0 +1,66 @@
+name: Image & Chart
+
+# Exercises the Dockerfile and the Helm chart on PRs (and pushes to main) so a
+# defect is caught in review rather than at `git push --tag` — the release
+# workflow (release.yml) is otherwise the first time either is ever built.
+# ci.yaml only covers the Go sources; these paths would have no CI without this.
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'charts/**'
+      - '.github/workflows/image-chart.yaml'
+      - '.github/workflows/release.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'charts/**'
+      - '.github/workflows/image-chart.yaml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Same multi-arch build as the release (release.yml), but push: false —
+      # proves the pure-Go cross-compile and the distroless-static runtime
+      # assemble for both architectures without publishing anything.
+      - name: Build multi-arch image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Lint chart
+        run: helm lint charts/pod-log-preserver
+
+      # Render with default values to catch template/schema errors that lint
+      # alone misses.
+      - name: Render chart templates
+        run: helm template pod-log-preserver charts/pod-log-preserver
