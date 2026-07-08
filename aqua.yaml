@@ -36,3 +36,8 @@ packages:
   # the chart lints, templates (all value permutations), and packages to a
   # byte-identical result under v4, so the release path is unaffected.
   - name: helm/helm@v4.2.2
+  # --- e2e (kind smoke, test/e2e/kind) ---
+  # kind runs a single-node cluster in Docker; the pinned node image below
+  # matches this kind minor. kubectl tracks the node's Kubernetes minor.
+  - name: kubernetes-sigs/kind@v0.31.0
+  - name: kubernetes/kubernetes/kubectl@v1.35.0

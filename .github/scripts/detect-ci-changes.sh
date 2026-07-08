@@ -20,6 +20,6 @@ if has '(\.go$|^go\.(mod|sum)$|^internal/version/VERSION$|^\.golangci\.ya?ml$)';
 if has '(^charts/|^\.github/workflows/release\.yaml$)'; then chart=true; fi
 if has '(^Dockerfile$|^\.dockerignore$|^\.github/workflows/release\.yaml$)'; then docker=true; fi
 if has '(^docs/|^README(\.ja)?\.md$|^package(-lock)?\.json$)'; then docs=true; fi
-if has '(^Makefile$|^aqua\.yaml$|^\.github/workflows/ci\.yaml$|^\.github/workflows/docs-lint\.yaml$|^\.github/scripts/)'; then infra=true; fi
+if has '(^Makefile$|^aqua\.yaml$|^\.github/workflows/ci\.yaml$|^\.github/workflows/docs-lint\.yaml$|^\.github/workflows/e2e\.yaml$|^\.github/scripts/)'; then infra=true; fi
 
 printf 'go=%s\nchart=%s\ndocker=%s\ndocs=%s\ninfra=%s\n' "$go" "$chart" "$docker" "$docs" "$infra"
