@@ -26,8 +26,10 @@ assert "package-is-docs" $'go=false\nchart=false\ndocker=false\ndocs=true\ninfra
 assert "infra-makefile"  $'go=false\nchart=false\ndocker=false\ndocs=false\ninfra=true'   "Makefile"
 assert "infra-aqua"      $'go=false\nchart=false\ndocker=false\ndocs=false\ninfra=true'   "aqua.yaml"
 assert "infra-detector"  $'go=false\nchart=false\ndocker=false\ndocs=false\ninfra=true'   ".github/scripts/detect-ci-changes.sh"
-assert "infra-ci-yaml"   $'go=false\nchart=false\ndocker=false\ndocs=false\ninfra=true'   ".github/workflows/ci.yaml"
-assert "go-and-chart"    $'go=true\nchart=true\ndocker=false\ndocs=false\ninfra=false'    "internal/x.go" "charts/pod-log-preserver/templates/daemonset.yaml"
+assert "infra-ci-yaml"       $'go=false\nchart=false\ndocker=false\ndocs=false\ninfra=true'   ".github/workflows/ci.yaml"
+assert "infra-docs-lint-yaml" $'go=false\nchart=false\ndocker=false\ndocs=false\ninfra=true'   ".github/workflows/docs-lint.yaml"
+assert "release-workflow"     $'go=false\nchart=true\ndocker=true\ndocs=false\ninfra=false'    ".github/workflows/release.yaml"
+assert "go-and-chart"         $'go=true\nchart=true\ndocker=false\ndocs=false\ninfra=false'    "internal/x.go" "charts/pod-log-preserver/templates/daemonset.yaml"
 assert "empty-input"     "$ALL_FALSE"                                                     ""
 
 [ "$fail" -eq 0 ] && echo "ALL PASS" || { echo "SOME FAILED"; exit 1; }
