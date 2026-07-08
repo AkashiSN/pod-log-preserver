@@ -108,6 +108,18 @@ func (k *Keeper) handleEvent(ev *syscall.InotifyEvent, name string) {
 	k.syncFile(full)
 }
 
+// handleOverflow recovers from an IN_Q_OVERFLOW: the kernel dropped an unknown
+// number of events, so it re-establishes the watch tree (new directories that
+// appeared during the gap may be unwatched) and runs a full resync to preserve
+// any files whose events were lost. This is the implementation of spec §7
+// risk #4. The unconditional periodic resync uses the same walkAndSync, so a
+// missed overflow only delays preservation by at most RESYNC_INTERVAL_SEC.
+func (k *Keeper) handleOverflow() {
+	logging.Warn("inotify queue overflow; resyncing watch tree")
+	_ = k.AddWatchRecursive(k.cfg.WatchDir)
+	k.walkAndSync(k.cfg.WatchDir)
+}
+
 // Run reads inotify events until ctx is cancelled or the fd is closed. It
 // blocks in Read (via the poller); a Close on the fd during shutdown surfaces
 // as a read error, treated as a clean stop once ctx is done. On IN_Q_OVERFLOW
@@ -125,9 +137,7 @@ func (k *Keeper) eventLoop(ctx context.Context) error {
 		for offset := 0; offset+syscall.SizeofInotifyEvent <= n; {
 			raw := (*syscall.InotifyEvent)(unsafe.Pointer(&buf[offset]))
 			if raw.Mask&syscall.IN_Q_OVERFLOW != 0 {
-				logging.Warn("inotify queue overflow; resyncing watch tree")
-				_ = k.AddWatchRecursive(k.cfg.WatchDir)
-				k.walkAndSync(k.cfg.WatchDir)
+				k.handleOverflow()
 			}
 			name := ""
 			if raw.Len > 0 {
