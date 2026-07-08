@@ -48,7 +48,9 @@ flowchart TD
 
 ## 5.2 Startup sequence
 
-1. Load configuration from environment variables (§5.4).
+1. Load configuration from environment variables (§5.4); **fail fast** if a
+   numeric value is out of range (a non-positive interval or age, or a
+   `METRICS_PORT` outside `1..65535`), reporting every offending key at once.
 2. Create the preserve directory; run the **hardlink validation test** (§4.1)
    against the pod's own container log — fail fast if it cannot hardlink.
 3. Bind the metrics listener synchronously — fail fast if `METRICS_PORT` is
@@ -104,3 +106,11 @@ All configuration is via environment variables:
 API (not the API server). Together they locate the pod's own container log under
 `WATCH_DIR/<POD_NAMESPACE>_<POD_NAME>_<POD_UID>/` for the §5.2 startup hardlink
 test. When any is unset, the test warns and skips instead of failing.
+
+The four interval/age values (`CLEANUP_INTERVAL_SEC`, `CLEANUP_MAX_AGE_MIN`,
+`CLEANUP_GZ_MAX_AGE_MIN`, `RESYNC_INTERVAL_SEC`) must be **positive integers**
+— they become `time.Ticker`/`time.Duration` inputs and a non-positive duration
+would panic at runtime — and `METRICS_PORT` must be in `1..65535`. Load-time
+validation (§5.2 step 1) rejects out-of-range values with a clear fail-fast
+error naming each offending key, rather than deferring the failure to a ticker
+panic.

@@ -65,6 +65,12 @@ func main() {
 // Keeper, and blocks in Keeper.Run until the signal-derived context is
 // cancelled — at which point the metrics server is shut down too.
 func run(cfg config.Config) error {
+	// Fail fast on out-of-range numeric config before any ticker is built from
+	// it (a non-positive interval would panic time.NewTicker at runtime).
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	m := &metrics.Metrics{}
 
 	// Fail fast if the watch and preserve dirs can't hardlink (spec §4.1 / §5.2);

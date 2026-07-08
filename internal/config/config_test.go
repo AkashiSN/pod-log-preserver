@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -129,5 +130,75 @@ func TestEnvStrAndEnvInt(t *testing.T) {
 	t.Setenv("PLP_INT", "nope")
 	if got := envInt("PLP_INT", 7); got != 7 {
 		t.Errorf("envInt(invalid) = %d, want fallback 7", got)
+	}
+}
+
+// validConfig returns a Config with all fields at documented, valid values,
+// as a base for mutation in TestValidate.
+func validConfig() Config {
+	return Config{
+		WatchDir:           "/var/log/pods",
+		PreserveDir:        "/var/log/pods-preserved",
+		CleanupIntervalSec: 60,
+		CleanupMaxAgeMin:   5,
+		CleanupGzMaxAgeMin: 60,
+		ResyncIntervalSec:  30,
+		LogLevel:           "info",
+		MetricsPort:        9113,
+		PreservedLogDBGlob: "/var/lib/fluent-bit/flb_kube*.db",
+	}
+}
+
+// TestValidate asserts a valid config passes and each duration/port field is
+// rejected with a fail-fast error (rather than panicking a ticker at runtime)
+// when set to a non-positive or out-of-range value.
+func TestValidate(t *testing.T) {
+	if err := validConfig().Validate(); err != nil {
+		t.Fatalf("valid config rejected: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(*Config)
+		wantKey string
+	}{
+		{"zero cleanup interval", func(c *Config) { c.CleanupIntervalSec = 0 }, "CLEANUP_INTERVAL_SEC"},
+		{"negative cleanup interval", func(c *Config) { c.CleanupIntervalSec = -1 }, "CLEANUP_INTERVAL_SEC"},
+		{"zero resync interval", func(c *Config) { c.ResyncIntervalSec = 0 }, "RESYNC_INTERVAL_SEC"},
+		{"negative resync interval", func(c *Config) { c.ResyncIntervalSec = -5 }, "RESYNC_INTERVAL_SEC"},
+		{"zero cleanup max age", func(c *Config) { c.CleanupMaxAgeMin = 0 }, "CLEANUP_MAX_AGE_MIN"},
+		{"negative cleanup gz max age", func(c *Config) { c.CleanupGzMaxAgeMin = -1 }, "CLEANUP_GZ_MAX_AGE_MIN"},
+		{"zero metrics port", func(c *Config) { c.MetricsPort = 0 }, "METRICS_PORT"},
+		{"metrics port too high", func(c *Config) { c.MetricsPort = 70000 }, "METRICS_PORT"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := validConfig()
+			tc.mutate(&cfg)
+			err := cfg.Validate()
+			if err == nil {
+				t.Fatalf("Validate() = nil, want error mentioning %s", tc.wantKey)
+			}
+			if !strings.Contains(err.Error(), tc.wantKey) {
+				t.Errorf("Validate() error = %q, want it to mention %s", err.Error(), tc.wantKey)
+			}
+		})
+	}
+}
+
+// TestValidateReportsAllProblems asserts Validate accumulates every offending
+// key in a single error, so one run surfaces all misconfigurations.
+func TestValidateReportsAllProblems(t *testing.T) {
+	cfg := validConfig()
+	cfg.CleanupIntervalSec = 0
+	cfg.MetricsPort = -1
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("Validate() = nil, want error")
+	}
+	for _, key := range []string{"CLEANUP_INTERVAL_SEC", "METRICS_PORT"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Errorf("error %q missing key %s", err.Error(), key)
+		}
 	}
 }

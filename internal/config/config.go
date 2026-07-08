@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -79,6 +81,29 @@ func Load() Config {
 	}
 
 	return cfg
+}
+
+// Validate checks the numeric configuration for values that would otherwise
+// fault at runtime — the interval and age fields become time.Ticker /
+// time.Duration inputs (a non-positive duration panics time.NewTicker), and
+// MetricsPort must be a bindable TCP port. It accumulates every offending key
+// so a single run surfaces all misconfigurations, and returns nil when the
+// configuration is usable. Callers should treat a non-nil result as fatal.
+func (c Config) Validate() error {
+	var errs []error
+	positive := func(key string, v int) {
+		if v <= 0 {
+			errs = append(errs, fmt.Errorf("%s must be a positive integer, got %d", key, v))
+		}
+	}
+	positive("CLEANUP_INTERVAL_SEC", c.CleanupIntervalSec)
+	positive("CLEANUP_MAX_AGE_MIN", c.CleanupMaxAgeMin)
+	positive("CLEANUP_GZ_MAX_AGE_MIN", c.CleanupGzMaxAgeMin)
+	positive("RESYNC_INTERVAL_SEC", c.ResyncIntervalSec)
+	if c.MetricsPort < 1 || c.MetricsPort > 65535 {
+		errs = append(errs, fmt.Errorf("METRICS_PORT must be in 1..65535, got %d", c.MetricsPort))
+	}
+	return errors.Join(errs...)
 }
 
 // envStr returns the value of key, or fallback when it is unset or empty.
