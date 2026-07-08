@@ -90,23 +90,6 @@ tests:
           path: spec.template.spec.containers[0].ports
           content: { name: metrics, containerPort: 9113, protocol: TCP }
 
-  - it: injects the pod identity via the downward API, not a Kubernetes API call
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: POD_UID
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.uid
-
   - it: emits Prometheus scrape annotations that match the metrics port by default
     asserts:
       - equal:

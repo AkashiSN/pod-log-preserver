@@ -25,15 +25,6 @@ type Config struct {
 	// preserved log tree. Empty disables DB-aware cleanup. The default matches
 	// flb_kube*.db so DBs of other fluent-bit inputs are never read by mistake.
 	PreservedLogDBGlob string
-	// PodNamespace, PodName, and PodUID identify this DaemonSet pod, injected via
-	// the Kubernetes downward API. They locate the pod's own container log under
-	// WatchDir (`<PodNamespace>_<PodName>_<PodUID>/`) for the startup hardlink
-	// validation test (spec §5.2). Empty (unset downward API) makes the test
-	// warn-and-skip rather than fail. This is not a Kubernetes API dependency —
-	// the values arrive as environment variables set by the kubelet.
-	PodNamespace string
-	PodName      string
-	PodUID       string
 }
 
 // configEnvKeys lists every environment variable Load reads. It exists so
@@ -49,9 +40,6 @@ var configEnvKeys = []string{
 	"LOG_LEVEL",
 	"METRICS_PORT",
 	"PRESERVED_LOG_DB_GLOB",
-	"POD_NAMESPACE",
-	"POD_NAME",
-	"POD_UID",
 }
 
 // Load reads configuration from the environment, applying the documented
@@ -67,9 +55,6 @@ func Load() Config {
 		LogLevel:           envStr("LOG_LEVEL", "info"),
 		MetricsPort:        envInt("METRICS_PORT", 9113),
 		PreservedLogDBGlob: envStr("PRESERVED_LOG_DB_GLOB", "/var/lib/fluent-bit/flb_kube*.db"),
-		PodNamespace:       envStr("POD_NAMESPACE", ""),
-		PodName:            envStr("POD_NAME", ""),
-		PodUID:             envStr("POD_UID", ""),
 	}
 
 	if filter := envStr("NAMESPACE_FILTER", ""); filter != "" {

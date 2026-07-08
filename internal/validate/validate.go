@@ -2,97 +2,91 @@ package validate
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
-// validateLinkName is the throwaway link created in the preserve directory by
-// the startup hardlink test. Unlike the earlier probe, no file is written into
-// the kubelet-owned watch tree: the test hardlinks the pod's own existing
-// container log, then removes the link.
-const validateLinkName = ".pod-log-preserver-validate"
+// validateProbeName is the throwaway source file the startup hardlink probe
+// creates in the preserve directory; validateProbeLink is the hardlink made to
+// it. Both live entirely under the preserve directory we own — nothing is ever
+// written into the kubelet-owned watch tree.
+const (
+	validateProbeName = ".pod-log-preserver-validate"
+	validateProbeLink = ".pod-log-preserver-validate.link"
+)
 
-// linkFile is os.Link behind a seam so the rotate-away race (own log vanishing
-// between location and hardlink) can be exercised deterministically in tests.
+// linkFile is os.Link behind a seam so a hardlink-unsupported filesystem can be
+// exercised deterministically in tests.
 var linkFile = os.Link
 
-// ValidationResult reports what the startup filesystem validation did so the
-// caller can log it. A zero-value result (Skipped=false, empty fields) with a
-// nil error means the hardlink test ran and passed.
-type ValidationResult struct {
-	Skipped   bool   // true when the pod's own container log could not be located
-	Reason    string // why it was skipped (empty unless Skipped)
-	TestedLog string // the own log that was hardlink-tested (empty when skipped)
+// statDev returns the device number (st_dev) of the filesystem holding path,
+// behind a seam so a cross-filesystem layout can be exercised in tests without a
+// second real filesystem.
+var statDev = func(path string) (uint64, error) {
+	var st syscall.Stat_t
+	if err := syscall.Stat(path, &st); err != nil {
+		return 0, err
+	}
+	return st.Dev, nil
 }
 
 // ValidateFilesystem is the fail-fast startup gate for the preservation
 // invariant (spec §4.1 / §5.2): the watch and preserve directories must share a
-// filesystem, or every os.Link would fail at runtime with logs already at risk.
-// It creates the preserve directory, locates the pod's own container log under
-// the watch tree (via the downward-API identity), and proves a hardlink of that
-// real log into the preserve directory succeeds.
+// hardlink-capable filesystem, or every runtime os.Link would fail with logs
+// already at risk. It creates the preserve directory, then proves the invariant
+// deterministically — with no dependency on pod identity or any pre-existing log:
 //
-// When the pod's own log cannot be located (identity not injected, or no log
-// yet), it warns and skips rather than failing — there is nothing safe to test
-// against. It only returns an error when the preserve dir cannot be created or
-// the hardlink itself fails (the same-filesystem invariant is broken).
-func ValidateFilesystem(watchDir, preserveDir, podNamespace, podName, podUID string) (ValidationResult, error) {
+//  1. Same filesystem: stat both directories and compare st_dev. A mismatch is
+//     the cross-filesystem misconfiguration and is fatal.
+//  2. Hardlink support: create a throwaway file in the preserve directory and
+//     hardlink it there. Success proves the filesystem supports hardlinks;
+//     failure (e.g. EOPNOTSUPP) is fatal. Because (1) already proved the watch
+//     directory is on the same filesystem, a preserve-local hardlink working
+//     implies a watch->preserve hardlink works.
+//
+// It returns an error only when the preserve dir cannot be created, a directory
+// cannot be stat'd, the two directories are on different filesystems, or the
+// hardlink probe fails. The gate never skips.
+func ValidateFilesystem(watchDir, preserveDir string) error {
 	if err := os.MkdirAll(preserveDir, 0o755); err != nil {
-		return ValidationResult{}, fmt.Errorf("create preserve dir %s: %w", preserveDir, err)
+		return fmt.Errorf("create preserve dir %s: %w", preserveDir, err)
 	}
 
-	dst := filepath.Join(preserveDir, validateLinkName)
-	// The own log can rotate or be removed by the kubelet between being located
-	// and being hard-linked. That surfaces as an ENOENT, which is a transient race
-	// rather than the same-filesystem invariant being broken — re-scan once (the
-	// kubelet reopens a fresh 0.log after rotating) before giving up and skipping.
-	// A genuine hardlink failure (e.g. EXDEV across filesystems) stays fatal.
-	for attempt := 0; attempt < 2; attempt++ {
-		ownLog, reason := findOwnContainerLog(watchDir, podNamespace, podName, podUID)
-		if ownLog == "" {
-			return ValidationResult{Skipped: true, Reason: reason}, nil
-		}
-
-		// Clear any link left by a crashed prior run before re-testing.
-		_ = os.Remove(dst)
-		err := linkFile(ownLog, dst)
-		if err == nil {
-			_ = os.Remove(dst)
-			return ValidationResult{TestedLog: ownLog}, nil
-		}
-		if os.IsNotExist(err) {
-			continue // own log rotated away mid-test; re-scan
-		}
-		return ValidationResult{}, fmt.Errorf("hardlink test %s -> %s failed (are the watch and preserve dirs on the same filesystem?): %w", ownLog, dst, err)
+	watchDev, err := statDev(watchDir)
+	if err != nil {
+		return fmt.Errorf("stat watch dir %s: %w", watchDir, err)
+	}
+	preserveDev, err := statDev(preserveDir)
+	if err != nil {
+		return fmt.Errorf("stat preserve dir %s: %w", preserveDir, err)
+	}
+	if watchDev != preserveDev {
+		return fmt.Errorf("watch dir %s and preserve dir %s are on different filesystems (st_dev %d != %d); hardlink preservation requires them to share one filesystem", watchDir, preserveDir, watchDev, preserveDev)
 	}
 
-	return ValidationResult{Skipped: true, Reason: "own container log kept rotating away during the hardlink test"}, nil
+	if err := hardlinkProbe(preserveDir); err != nil {
+		return fmt.Errorf("hardlink probe in preserve dir %s failed (does the filesystem support hardlinks?): %w", preserveDir, err)
+	}
+	return nil
 }
 
-// findOwnContainerLog returns a regular `*.log` file belonging to this pod,
-// found under <watchDir>/<ns>_<name>_<uid>/. It returns an empty path and a
-// human-readable reason when the pod identity is not fully injected or no own
-// container log exists yet.
-func findOwnContainerLog(watchDir, podNamespace, podName, podUID string) (path, reason string) {
-	if podNamespace == "" || podName == "" || podUID == "" {
-		return "", "pod identity not injected via the downward API (POD_NAMESPACE/POD_NAME/POD_UID)"
-	}
-	podDir := filepath.Join(watchDir, podNamespace+"_"+podName+"_"+podUID)
+// hardlinkProbe creates a throwaway file in preserveDir and hardlinks it there,
+// cleaning up both regardless of outcome. It returns an error if the filesystem
+// rejects the hardlink.
+func hardlinkProbe(preserveDir string) error {
+	src := filepath.Join(preserveDir, validateProbeName)
+	dst := filepath.Join(preserveDir, validateProbeLink)
+	// Clear any files left by a crashed prior run before probing.
+	_ = os.Remove(src)
+	_ = os.Remove(dst)
+	defer func() {
+		_ = os.Remove(src)
+		_ = os.Remove(dst)
+	}()
 
-	var found string
-	err := filepath.WalkDir(podDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.Type().IsRegular() && filepath.Ext(p) == ".log" {
-			found = p
-			return fs.SkipAll
-		}
-		return nil
-	})
-	if err != nil || found == "" {
-		return "", fmt.Sprintf("no own container log found under %s", podDir)
+	if err := os.WriteFile(src, nil, 0o600); err != nil {
+		return err
 	}
-	return found, ""
+	return linkFile(src, dst)
 }
