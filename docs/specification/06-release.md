@@ -11,6 +11,10 @@
   `oci://ghcr.io/akashisn/charts/pod-log-preserver`, published by a
   tag-triggered release workflow. The binary embeds its version, which must
   match the git tag.
+- The chart's `Chart.yaml` is the human-readable record of the release: its
+  `version` (bare SemVer) and `appVersion` (leading `v`, matching the binary)
+  must match the git tag. The release guard asserts this and fails fast on a
+  mismatch, so the published chart is exactly what is committed on `main`.
 - Licensed under the Apache License 2.0.
 
 ## 6.2 Roadmap
