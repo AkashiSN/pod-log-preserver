@@ -29,3 +29,18 @@ EKS Auto Mode では kubelet がマネージドであり、そのログローテ
 ## 1.5 ログ収集パイプラインにおける位置づけ
 
 `pod-log-preserver` はログエージェントのパスの中には存在せず、その隣に位置する。kubelet は `/var/log/pods` 配下にログを書き込み、エージェントはそれを tail する。`pod-log-preserver` はそれらをハードリンクで退避させ、エージェント自身の進捗 DB を読み取り専用で参照することで、エージェントがそのファイルを処理し終えた時点でのみ、保全済みのコピーを削除する。
+
+```mermaid
+flowchart TD
+    kubelet[kubelet] -->|"① 書き込み・ローテート"| pods["/var/log/pods<br/>（アクティブ + ローテートログ）"]
+    plp["pod-log-preserver<br/>（DaemonSet・root）"]
+    pods -->|"② inotify で監視"| plp
+    plp -->|"③ ハードリンクで退避（同一 inode）"| preserved["/var/log/pods-preserved"]
+    agent["fluent-bit（tail input）"] -->|"④ 両ツリーを tail"| pods
+    agent --> preserved
+    agent -->|"⑤ 読み取りオフセットを記録"| taildb[("tail DB<br/>flb_kube*.db")]
+    taildb -->|"⑥ 読み取り専用で参照"| plp
+    plp -->|"⑦ offset ≥ size で削除"| preserved
+```
+
+番号付きのエッジがエンドツーエンドの流れである。kubelet がログを書き込み・ローテートし（①）、`pod-log-preserver` がそれを監視して（②）、inode を共有したままハードリンクで退避させる（③）。fluent-bit はライブツリーと保全ツリーの両方を tail し（④）、inode ごとに読み取りオフセットを tail DB に記録する（⑤）。`pod-log-preserver` はその DB を読み取り専用で参照し（⑥）、記録されたオフセットがファイルサイズに達した時点でのみ保全コピーを削除する（⑦）。

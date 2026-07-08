@@ -8,7 +8,22 @@ EKS Auto Mode では kubelet の `containerLogMaxSize`（10MB）と `containerLo
 
 ## 仕組み
 
-DaemonSet として動作し、`/var/log/pods` を監視して各 Pod ログを同一ファイルシステム上の保全ディレクトリに**ハードリンク**する。これにより kubelet が元ファイルを削除してもバイト列は生き続ける。クリーンアップループはログエージェント（fluent-bit）の tail DB を**読み取り専用**で参照し、エージェントが読み終えた保全ファイルだけを削除する。未確認のファイルは age 閾値によるフォールバックで削除される。詳細な設計は[仕様書](docs/ja/specification/)を参照。
+DaemonSet として動作し、`/var/log/pods` を監視して各 Pod ログを同一ファイルシステム上の保全ディレクトリに**ハードリンク**する。これにより kubelet が元ファイルを削除してもバイト列は生き続ける。クリーンアップループはログエージェント（fluent-bit）の tail DB を**読み取り専用**で参照し、エージェントが読み終えた保全ファイルだけを削除する。未確認のファイルは age 閾値によるフォールバックで削除される。
+
+```mermaid
+flowchart TD
+    kubelet[kubelet] -->|"① 書き込み・ローテート"| pods["/var/log/pods"]
+    plp["pod-log-preserver"]
+    pods -->|"② inotify で監視"| plp
+    plp -->|"③ ハードリンクで退避（同一 inode）"| preserved["/var/log/pods-preserved"]
+    agent["fluent-bit"] -->|"④ 両ツリーを tail"| pods
+    agent --> preserved
+    agent -->|"⑤ 読み取りオフセットを記録"| taildb[("tail DB")]
+    taildb -->|"⑥ 読み取り専用で参照"| plp
+    plp -->|"⑦ 読み終えたら削除"| preserved
+```
+
+詳細な設計は[仕様書](docs/ja/specification/)を参照。
 
 ## インストール（Helm）
 

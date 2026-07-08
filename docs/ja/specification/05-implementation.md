@@ -21,13 +21,43 @@ DaemonSet として動作する単一バイナリの Go プログラムで、Go 
 
 メトリクス用の HTTP サーバーが並行して動作する。SIGTERM / SIGINT は context をキャンセルし、inotify の fd を閉じてイベントループのブロックを解除し、クリーンなシャットダウンを行う。
 
+```mermaid
+flowchart TD
+    subgraph proc["pod-log-preserver プロセス"]
+        direction TB
+        event["イベントループ<br/>（inotify watch tree）"]
+        resync["定期 resync<br/>（full walk）"]
+        cleanup["クリーンアップループ<br/>（孤児削除）"]
+        metrics["メトリクス HTTP サーバー<br/>/metrics"]
+        state[("共有カウンタ")]
+    end
+    event & resync -->|ハードリンク| pres["/var/log/pods-preserved"]
+    cleanup -->|"読み取り専用"| taildb[("tail DB")]
+    cleanup -->|孤児を削除| pres
+    event & resync & cleanup & metrics --> state
+    sig["SIGTERM / SIGINT"] -.->|context キャンセル| proc
+```
+
 ## 5.2 起動シーケンス
 
 1. 環境変数から設定をロードする（§5.4）。
 2. 保全ディレクトリを作成し、Pod 自身のコンテナログに対して **ハードリンク検証テスト**（§4.1）を実行する。ハードリンクできない場合は早期に失敗する。
-3. 初期同期: watch ディレクトリを walk し、既存の一致するログをすべてハードリンクする。
-4. 再帰的な inotify の watch tree を確立する。
-5. メトリクスサーバーと resync / クリーンアップループを開始し、イベントループに入る。
+3. メトリクス listener を同期的にバインドし（`METRICS_PORT` が使用中なら早期に失敗する）、`/metrics` の提供を開始する。
+4. 初期同期: watch ディレクトリを walk し、既存の一致するログをすべてハードリンクする。
+5. 再帰的な inotify の watch tree を確立する。
+6. resync / クリーンアップループを開始し、イベントループに入る。
+
+```mermaid
+flowchart LR
+    a["設定ロード"] --> b["保全ディレクトリ作成<br/>+ ハードリンクテスト"]
+    b -->|失敗| x["終了（fail-fast）"]
+    b -->|"成功 / スキップ"| m["メトリクス listener<br/>バインド"]
+    m -->|"ポート使用中"| x
+    m --> c["初期同期"]
+    c --> d["inotify watch tree"]
+    d --> e["resync + cleanup<br/>ループ開始"]
+    e --> f["イベントループ"]
+```
 
 ## 5.3 Tail DB の読み取り
 

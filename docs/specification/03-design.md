@@ -27,6 +27,19 @@ link count:
 - `Nlink == 1` — an **orphan**; the original was deleted, only the preserved
   hardlink remains. It is a deletion candidate.
 
+Each orphan's fate is then decided confirmation-first, age-second (§3.2–§3.3):
+
+```mermaid
+flowchart TD
+    start(["preserved file"]) --> nlink{"Nlink > 1 ?"}
+    nlink -->|yes| keep1["keep<br/>(original still exists)"]
+    nlink -->|"no — orphan"| db{"tail DB confirms<br/>offset ≥ size ?"}
+    db -->|yes| del1["delete immediately<br/>(confirmation-first, §3.2)"]
+    db -->|"no / no row"| age{"older than<br/>age threshold ?"}
+    age -->|yes| del2["delete<br/>(age fallback, §3.3)"]
+    age -->|no| keep2["keep<br/>(young &amp; unconfirmed)"]
+```
+
 For any orphaned preserved file — including an active log's snapshot, which
 survives kubelet's rotation of its inode as the sole preserved link via inode
 dedup — `pod-log-preserver` consults the log agent's tail DBs (loaded once per

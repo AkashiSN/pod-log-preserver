@@ -46,3 +46,23 @@ read, losing those lines permanently.
 writes logs under `/var/log/pods`; the agent tails them; `pod-log-preserver`
 hardlinks them aside and, by reading the agent's own progress DB read-only,
 deletes each preserved copy only once the agent has finished with it.
+
+```mermaid
+flowchart TD
+    kubelet[kubelet] -->|"① writes &amp; rotates"| pods["/var/log/pods<br/>(active + rotated logs)"]
+    plp["pod-log-preserver<br/>(DaemonSet, root)"]
+    pods -->|"② watched via inotify"| plp
+    plp -->|"③ hardlink aside (same inode)"| preserved["/var/log/pods-preserved"]
+    agent["fluent-bit (tail input)"] -->|"④ tails both trees"| pods
+    agent --> preserved
+    agent -->|"⑤ records read offset"| taildb[("tail DB<br/>flb_kube*.db")]
+    taildb -->|"⑥ read-only"| plp
+    plp -->|"⑦ delete once offset ≥ size"| preserved
+```
+
+The numbered edges are the end-to-end flow: the kubelet writes and rotates logs
+(①); `pod-log-preserver` watches them (②) and hardlinks each aside, sharing the
+inode (③); fluent-bit tails both the live and preserved trees (④) and records
+its read offset per inode in its tail DB (⑤); `pod-log-preserver` reads that DB
+read-only (⑥) and deletes a preserved copy only once the recorded offset has
+reached the file size (⑦).
