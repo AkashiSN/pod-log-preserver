@@ -72,7 +72,7 @@ func reclaimOwnership(t *testing.T, dir string) {
 	t.Helper()
 	cmd := exec.Command("docker", "run", "--rm",
 		"-v", dir+":/work",
-		"busybox",
+		"busybox:1.37",
 		"chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/work",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
