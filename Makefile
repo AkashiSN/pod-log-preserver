@@ -67,6 +67,12 @@ tidy: aqua-tools
 clean:
 	rm -rf $(BIN_DIR)
 
+## e2e-container: build the image and run the container e2e harness (needs Docker)
+.PHONY: e2e-container
+e2e-container: aqua-tools
+	docker build -t pod-log-preserver:e2e .
+	$(GO) test -tags e2e -count=1 -v -timeout 20m ./test/e2e/container/...
+
 ## help: list available targets
 .PHONY: help
 help:
