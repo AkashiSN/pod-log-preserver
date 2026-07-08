@@ -1,0 +1,38 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/aqua-yaml.json
+#
+# aqua (https://aquaproj.github.io) is the single source of truth for the
+# versions of every CLI this repo builds, tests, and lints with — the Go
+# toolchain included. Tools are resolved from $PATH (aqua's bin dir) and lazily
+# installed at the exact pinned version on first use, so local `make` and CI use
+# byte-identical tools with no per-tool GitHub Action.
+#
+# To work on this repo locally:
+#   1. Install aqua            -> https://aquaproj.github.io/docs/install
+#   2. Put aqua's bin on $PATH -> e.g. `export PATH="$(aqua root-dir)/bin:$PATH"`
+# `make build/test/lint` and CI then pick the tools up automatically. Bump a
+# version here — never reintroduce a free-floating `go install`/action version.
+#
+# The standard registry carries every tool this repo needs (Go, golangci-lint,
+# helm), so — unlike node-rotation-controller, which pulls controller-gen from a
+# local registry — there is no aqua-policy.yaml and no local registry here, and
+# CI's aqua-installer needs no policy_allow.
+registries:
+  - type: standard
+    ref: v4.526.0 # renovate: depName=aquaproj/aqua-registry
+packages:
+  # The Go toolchain itself is pinned so local `make` and CI use the exact same
+  # compiler (no actions/setup-go). MUST stay in sync with the `go` directive in
+  # go.mod (currently `go 1.26.4`) — bump both together, or Go's GOTOOLCHAIN=auto
+  # will silently download a newer toolchain and bypass this pin.
+  - name: golang/go@go1.26.4
+  # golangci-lint v2 line — matches this repo's .golangci.yml (config version
+  # "2"). The pinned version must be a release whose prebuilt binary was built
+  # with a Go >= go.mod's minor: golangci-lint refuses to run when its build Go
+  # minor is older than the targeted one, so v2.12.2 (built with go1.26) works
+  # against `go 1.26.4` while older v2.1.x (built with go1.24) does not.
+  - name: golangci/golangci-lint@v2.12.2
+  # helm pinned to the v4 line. CI previously used azure/setup-helm at v3.16.3;
+  # the chart lints, templates (all value permutations), and packages to a
+  # byte-identical result under v4, so the release path is unaffected.
+  - name: helm/helm@v4.2.2

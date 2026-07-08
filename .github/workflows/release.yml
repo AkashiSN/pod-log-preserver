@@ -94,9 +94,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: azure/setup-helm@v4
+      # helm is pinned in aqua.yaml (v4 line) and resolved from $PATH; no
+      # azure/setup-helm, so local packaging and this release path use the same helm.
+      - uses: aquaproj/aqua-installer@v4.0.4
         with:
-          version: v3.16.3
+          aqua_version: v2.60.1
 
       - name: Helm registry login
         run: |

@@ -11,6 +11,7 @@ on:
       - 'Dockerfile'
       - '.dockerignore'
       - 'charts/**'
+      - 'aqua.yaml'
       - '.github/workflows/image-chart.yaml'
       - '.github/workflows/release.yml'
   push:
@@ -20,6 +21,7 @@ on:
       - 'Dockerfile'
       - '.dockerignore'
       - 'charts/**'
+      - 'aqua.yaml'
       - '.github/workflows/image-chart.yaml'
       - '.github/workflows/release.yml'
   workflow_dispatch:
@@ -53,9 +55,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: azure/setup-helm@v4
+      # helm is pinned in aqua.yaml (v4 line) and resolved from $PATH; no
+      # azure/setup-helm. This is the same helm the release workflow packages with.
+      - uses: aquaproj/aqua-installer@v4.0.4
         with:
-          version: v3.16.3
+          aqua_version: v2.60.1
 
       - name: Lint chart
         run: helm lint charts/pod-log-preserver
