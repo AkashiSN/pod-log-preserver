@@ -1,27 +1,53 @@
 name: Docs lint
 on:
   pull_request:
-    paths:
-      - 'docs/**'
-      - 'README.md'
-      - 'README.ja.md'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/docs-lint.yaml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Kept separate from ci.yaml so the Node toolchain does not bloat the
+# Go/chart/docker workflow (the same reasoning node-rotation-controller uses to
+# keep e2e in its own file). Single self-detecting job: it always runs so a
+# required check never hangs `pending`; the heavy npm build is gated on an
+# in-job change-detection step. The classifier is self-tested in ci.yaml's
+# `changes` job, so it is not re-tested here.
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history so the diff can reach the PR base commit.
+          fetch-depth: 0
+      - name: Detect changed paths
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "event=${{ github.event_name }} → running docs build"
+            printf 'docs=true\ninfra=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$BASE_SHA" HEAD \
+            | tee /dev/stderr \
+            | bash .github/scripts/detect-ci-changes.sh >> "$GITHUB_OUTPUT"
+          echo "--- classification ---"; cat "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.docs == 'true' || steps.detect.outputs.infra == 'true'
         with:
           node-version: 24
-      - run: npm ci
+      - name: npm ci
+        if: steps.detect.outputs.docs == 'true' || steps.detect.outputs.infra == 'true'
+        run: npm ci
       # docs:build runs VitePress with the dead-link checker enabled, so a
       # broken cross-page link or an invalid config fails the PR.
-      - run: npm run docs:build
+      - name: docs:build
+        if: steps.detect.outputs.docs == 'true' || steps.detect.outputs.infra == 'true'
+        run: npm run docs:build
