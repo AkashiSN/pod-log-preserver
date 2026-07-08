@@ -1,5 +1,8 @@
 # pod-log-preserver
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-v0.5.0_in_development_(pre--1.0)-orange.svg)](docs/ja/specification/)
+
 EKS Auto Mode 上で kubelet がローテートした Pod ログを、ログエージェントが収集し終えるまで保全し、その後ディスクを自動で回収するツール。
 
 ## なぜ必要か
