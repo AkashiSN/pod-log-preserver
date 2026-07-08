@@ -7,9 +7,8 @@ import (
 )
 
 // Metrics holds the process-wide counters the three loops share. They are
-// exported over HTTP by the metrics endpoint (added in a later issue). The
-// increment sites are introduced alongside the preservation and cleanup loops
-// that own each counter.
+// exported over HTTP by the metrics endpoint, and incremented by the
+// preservation and cleanup loops that own each counter.
 type Metrics struct {
 	PreservedFiles     atomic.Int64 // gauge: files currently in the preserve tree
 	OrphanedFiles      atomic.Int64 // gauge: preserved files with Nlink==1

@@ -20,10 +20,10 @@ import (
 	"github.com/AkashiSN/pod-log-preserver/internal/version"
 )
 
-// main loads configuration, logs the effective settings, and runs the
-// preservation path: an initial sync, a recursive inotify watch tree, a
-// periodic resync, and the tail-DB-confirmed cleanup loop. The metrics server
-// is wired up in a later issue of the v0.5 milestone.
+// main loads configuration, logs the effective settings, serves the metrics
+// endpoint, and runs the preservation path: an initial sync, a recursive
+// inotify watch tree, a periodic resync, and the tail-DB-confirmed cleanup
+// loop.
 func main() {
 	log.SetFlags(0) // timestamps handled by container runtime
 
