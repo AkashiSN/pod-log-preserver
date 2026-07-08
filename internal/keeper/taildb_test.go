@@ -3,6 +3,7 @@ package keeper
 import (
 	"crypto/sha256"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,9 +12,24 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// tailDBBaselineSchema is fluent-bit's in_tail_files table for the versions
+// pod-log-preserver supports (2.x–3.x; the e2e harness pins 3.1.9). It is the
+// documented minimum schema the read path depends on — readTailDB reads only
+// the inode, offset, and name columns (spec §5.3) — kept in one place so the
+// fixtures below and the schema contract in the spec cannot drift apart.
+const tailDBBaselineSchema = `CREATE TABLE in_tail_files (
+	id INTEGER PRIMARY KEY,
+	name TEXT NOT NULL,
+	offset INTEGER,
+	inode INTEGER,
+	created INTEGER,
+	rotated INTEGER DEFAULT 0
+)`
+
 // buildTailDB creates a fluent-bit-style in_tail_files SQLite database at path
-// in WAL mode, inserts the given rows, and checkpoints so the main file is
-// self-contained. Each row is {inode, offset, name}.
+// in WAL mode using the baseline schema, inserts the given rows, and
+// checkpoints so the main file is self-contained. Each row is {inode, offset,
+// name}.
 func buildTailDB(t *testing.T, path string, rows []dbEntry, inodes []uint64) {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)")
@@ -21,14 +37,7 @@ func buildTailDB(t *testing.T, path string, rows []dbEntry, inodes []uint64) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	if _, err := db.Exec(`CREATE TABLE in_tail_files (
-		id INTEGER PRIMARY KEY,
-		name TEXT NOT NULL,
-		offset INTEGER,
-		inode INTEGER,
-		created INTEGER,
-		rotated INTEGER DEFAULT 0
-	)`); err != nil {
+	if _, err := db.Exec(tailDBBaselineSchema); err != nil {
 		t.Fatal(err)
 	}
 	for i, r := range rows {
@@ -41,6 +50,100 @@ func buildTailDB(t *testing.T, path string, rows []dbEntry, inodes []uint64) {
 	}
 	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// execDB opens a fresh WAL SQLite DB at path, runs each statement in order, and
+// checkpoints so the main file is self-contained. It lets a test build a tail
+// DB with a non-baseline schema (extra or missing columns) to exercise
+// readTailDB's tolerance and its safe-fallback boundary.
+func execDB(t *testing.T, path string, stmts ...string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	for _, s := range stmts {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatalf("exec %q: %v", s, err)
+		}
+	}
+	if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// tailDBSchemaWithMarkers is fluent-bit's in_tail_files as of the 5.x series
+// (v5.0.0+), which adds offset_marker/offset_marker_size to the baseline via
+// ALTER TABLE migrations (verified against tail_sql.h at v5.0.9). readTailDB
+// names only inode/offset/name, so these extra columns must not affect the read.
+const tailDBSchemaWithMarkers = `CREATE TABLE in_tail_files (
+	id INTEGER PRIMARY KEY,
+	name TEXT NOT NULL,
+	offset INTEGER,
+	inode INTEGER,
+	created INTEGER,
+	rotated INTEGER DEFAULT 0,
+	offset_marker INTEGER DEFAULT 0,
+	offset_marker_size INTEGER DEFAULT 0
+)`
+
+// TestReadTailDBAcrossFluentBitMajors is the executable support matrix for the
+// tail-DB schema (spec §5.3). It builds the in_tail_files schema fluent-bit ships
+// in each major version — taken verbatim from plugins/in_tail/tail_sql.h at the
+// noted tag — and asserts readTailDB reads inode/offset/name identically from
+// every one. Majors 1.x–4.x share the baseline schema byte-for-byte; 5.x adds
+// offset_marker/offset_marker_size, which the named-column query ignores. A
+// regression to a positional SELECT * would fail the 5.x case.
+func TestReadTailDBAcrossFluentBitMajors(t *testing.T) {
+	const (
+		name  = "/var/log/pods-preserved/ns_pod_uid/c/0.log.20240101-000000"
+		inode = uint64(900)
+		off   = int64(2048)
+	)
+	majors := []struct {
+		version string // representative tag whose tail_sql.h schema this is
+		schema  string
+	}{
+		{"1.x (v1.9.10)", tailDBBaselineSchema},
+		{"2.x (v2.2.3)", tailDBBaselineSchema},
+		{"3.x (v3.1.9)", tailDBBaselineSchema},
+		{"4.x (v4.2.3)", tailDBBaselineSchema},
+		{"5.x (v5.0.9)", tailDBSchemaWithMarkers},
+	}
+	for _, m := range majors {
+		t.Run(m.version, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "flb_kube.db")
+			execDB(t, path, m.schema,
+				fmt.Sprintf("INSERT INTO in_tail_files (name, offset, inode) VALUES ('%s', %d, %d)", name, off, inode))
+
+			got, err := readTailDB(path)
+			if err != nil {
+				t.Fatalf("readTailDB on the %s schema: %v", m.version, err)
+			}
+			es := got[inode]
+			if len(es) != 1 || es[0].offset != off || es[0].name != name {
+				t.Fatalf("%s: inode %d = %+v, want one row {offset %d, %q}", m.version, inode, es, off, name)
+			}
+		})
+	}
+}
+
+// TestReadTailDBErrorsOnSchemaMissingInode documents the safe-fallback boundary:
+// a DB whose in_tail_files lacks the required inode column makes the query
+// error, so loadTailDBs counts it (fluentbit_db_errors_total), skips it, and the
+// affected orphans fall back to age-based cleanup — a safe direction (deletion
+// delayed, never premature) rather than a silent misread (spec §5.3).
+func TestReadTailDBErrorsOnSchemaMissingInode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "flb_kube.db")
+	execDB(t, path,
+		`CREATE TABLE in_tail_files (id INTEGER PRIMARY KEY, name TEXT NOT NULL, offset INTEGER)`,
+		`INSERT INTO in_tail_files (name, offset) VALUES ('/var/log/pods/ns_pod_uid/c/0.log', 1)`,
+	)
+
+	if _, err := readTailDB(path); err == nil {
+		t.Fatal("readTailDB on a schema without the inode column should error, forcing the safe age fallback")
 	}
 }
 

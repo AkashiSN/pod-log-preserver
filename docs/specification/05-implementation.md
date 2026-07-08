@@ -86,6 +86,25 @@ fatal. The runtime driver is pure-Go `modernc.org/sqlite` (no CGO) so the image
 can be distroless static; the read-only DSN uses `mode=ro` and a
 `busy_timeout` pragma.
 
+**Supported fluent-bit versions (tail-DB schema matrix).** The read depends
+only on fluent-bit's `in_tail_files` table and its `inode`, `offset`, and `name`
+columns, where `offset` is the number of bytes fluent-bit has read (comparable
+to the file's size). Because the query **names** those three columns rather than
+using `SELECT *`, additive schema changes do not affect it.
+
+| fluent-bit | `in_tail_files` columns | tail-DB read |
+| --- | --- | --- |
+| **1.x – 4.x** (every released major) | `id, name, offset, inode, created, rotated` | **supported** — the schema is byte-for-byte identical across these majors (verified against `plugins/in_tail/tail_sql.h` at `v1.9.10`, `v2.2.3`, `v3.0.7`, `v3.1.9`, `v3.2.0`, `v4.0.0`, `v4.2.3`) |
+| **5.x** (`v5.0.0` and later) | the above **+** `offset_marker`, `offset_marker_size` | **supported** — the two added columns are ignored by the named-column query (verified against `tail_sql.h` at `v5.0.9`) |
+| a DB missing `inode`, or a non-fluent-bit schema | unrecognized | the query errors; it is counted (`fluentbit_db_errors_total`), the DB is skipped, and its orphans fall back to age-based cleanup |
+
+The e2e harness pins `fluent/fluent-bit:3.1.9` as the live-validated version;
+the version-independence in the table is pinned by a unit-test support matrix
+that builds each major's schema and asserts the read. The fallback direction is
+always safe — deletion is delayed, never premature — so a non-fluent-bit or a
+future-incompatible schema degrades to age-only cleanup rather than a silent
+misread (see §7.3 for the pluggable-reader open question).
+
 ## 5.4 Configuration schema
 
 All configuration is via environment variables:
