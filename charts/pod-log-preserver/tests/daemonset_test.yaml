@@ -1,10 +1,9 @@
 suite: DaemonSet rendered content
 # Asserts the rendered DaemonSet matches the spec's load-bearing invariants —
 # the two hostPath mounts (one filesystem for hardlinks, §3/§4), the root
-# securityContext (reading kubelet logs + hardlinking need uid 0, §4.4), the
-# cleanup/age env wiring (§5.4), and the downward-API identity injected as plain
-# env, not a Kubernetes API call (§4.3/§5.2). A regression that rewired any of
-# these would pass `helm template` today; these assertions catch it.
+# securityContext (reading kubelet logs + hardlinking need uid 0, §4.4), and the
+# cleanup/age env wiring (§5.4). A regression that rewired any of these would
+# pass `helm template` today; these assertions catch it.
 templates:
   - templates/daemonset.yaml
 tests:

@@ -70,8 +70,8 @@ jobs:
         run: helm template pod-log-preserver charts/pod-log-preserver
 
       # Rendered-manifest content assertions: prove the load-bearing invariants
-      # (two hostPath mounts, root securityContext, cleanup/age env wiring,
-      # downward-API identity) match the spec, not just that the chart renders.
+      # (two hostPath mounts, root securityContext, cleanup/age env wiring)
+      # match the spec, not just that the chart renders.
       # --verify=false skips Helm 4's plugin provenance check (helm is pinned to
       # the v4 line in aqua.yaml; the helm-unittest release ships no .prov).
       - name: Install helm-unittest plugin
