@@ -44,11 +44,10 @@
           "description": "\"debug\" or \"info\"; any other value shows only warn/error (spec §5)."
         },
         "metricsPort": {
-          "anyOf": [
-            { "type": "integer", "minimum": 1, "maximum": 65535 },
-            { "type": "string", "enum": [""] }
-          ],
-          "description": "A bindable TCP port (1..65535); empty falls back to the binary default. The binary rejects an out-of-range port at startup (spec §5.4)."
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "A bindable TCP port (1..65535). Unlike the env-only interval/age values, metricsPort is also rendered structurally into the container's containerPort and the Prometheus scrape annotation, so an empty string is NOT accepted here — it would emit an invalid empty containerPort while still passing helm lint/template."
         },
         "preservedLogDBGlob": {
           "type": "string",

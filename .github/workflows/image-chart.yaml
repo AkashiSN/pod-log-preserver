@@ -111,6 +111,11 @@ jobs:
             --set config.metricsPort=70000
           assert_rejected "config.metricsPort non-numeric" \
             --set config.metricsPort=abc
+          # Empty metricsPort must be rejected: unlike the env-only intervals it
+          # also renders into the container's containerPort, and an empty value
+          # there is an invalid manifest that helm lint/template would still pass.
+          assert_rejected "config.metricsPort empty (renders an invalid containerPort)" \
+            --set config.metricsPort=
           assert_rejected "config.cleanupIntervalSec=0 (must be a positive integer)" \
             --set config.cleanupIntervalSec=0
           assert_rejected "config.watchDir empty (minLength 1)" \
