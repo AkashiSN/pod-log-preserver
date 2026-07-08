@@ -1,9 +1,10 @@
 name: Release
 
 # Tag-triggered release: publishes the multi-arch image and the OCI Helm chart
-# to GHCR. The git tag (e.g. v0.5.0) must match the embedded VERSION; the chart
-# version strips the leading "v" to satisfy SemVer while the image tag and chart
-# appVersion keep it, matching the binary's self-reported version.
+# to GHCR. A guard job asserts the git tag agrees with the committed Chart.yaml
+# (version is bare SemVer, appVersion keeps the leading "v"), and the image job
+# re-checks it against the embedded VERSION, so what ships is exactly what is on
+# main — the chart is packaged from the committed Chart.yaml with no override.
 #
 # One-time follow-up after the first successful publish: make the GHCR packages
 # (ghcr.io/akashisn/pod-log-preserver and ghcr.io/akashisn/charts/pod-log-preserver)
@@ -26,7 +27,26 @@ env:
   CHART_REPO: oci://ghcr.io/akashisn/charts
 
 jobs:
+  # Fail fast if the tag disagrees with Chart.yaml, before anything is built or
+  # pushed. The git tag is the source of truth for a release; Chart.yaml is the
+  # human-readable record on main and the two must agree (spec §6.1). Exposes the
+  # bare-SemVer version for the chart job's packaged-file name.
+  guard:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check tag matches Chart.yaml
+        id: check
+        run: |
+          out="$(.github/scripts/check-chart-version.sh "${GITHUB_REF_NAME}")"
+          echo "$out"
+          echo "$out" >> "${GITHUB_OUTPUT}"   # script prints version=<x.y.z>
+
   image:
+    needs: guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -69,17 +89,10 @@ jobs:
           provenance: false
 
   chart:
-    needs: image
+    needs: [guard, image]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Derive chart version
-        id: version
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          # Helm chart versions are SemVer without a leading "v".
-          echo "chart_version=${tag#v}" >> "${GITHUB_OUTPUT}"
 
       - uses: azure/setup-helm@v4
         with:
@@ -92,20 +105,20 @@ jobs:
 
       - name: Package and push chart
         run: |
-          # --version strips the "v" (SemVer); --app-version keeps it so the
-          # chart's default image tag resolves to the image published above.
-          helm package charts/pod-log-preserver \
-            --version "${{ steps.version.outputs.chart_version }}" \
-            --app-version "${{ github.ref_name }}"
+          # No --version/--app-version override: the guard job already asserted
+          # the committed Chart.yaml matches the tag, so packaging it verbatim
+          # ships exactly what is on main. The .tgz name carries Chart.yaml's
+          # bare-SemVer version, surfaced by the guard job.
+          helm package charts/pod-log-preserver
           helm push \
-            "pod-log-preserver-${{ steps.version.outputs.chart_version }}.tgz" \
+            "pod-log-preserver-${{ needs.guard.outputs.version }}.tgz" \
             "${{ env.CHART_REPO }}"
 
       - name: Upload packaged chart artifact
         uses: actions/upload-artifact@v4
         with:
           name: chart-tgz
-          path: pod-log-preserver-${{ steps.version.outputs.chart_version }}.tgz
+          path: pod-log-preserver-${{ needs.guard.outputs.version }}.tgz
 
   release:
     needs: chart

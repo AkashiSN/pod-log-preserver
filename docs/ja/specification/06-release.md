@@ -6,6 +6,7 @@
 - 設定スキーマとメトリクス名が安定するまでは pre-1.0（`v0.x.y`）とする。
 - 互換性の対象範囲は、環境変数による設定キー、Prometheus のメトリクス名、および保全ログディレクトリのレイアウトである。
 - 配布: `ghcr.io/akashisn/pod-log-preserver` のマルチアーキイメージと、`oci://ghcr.io/akashisn/charts/pod-log-preserver` の OCI Helm chart を、タグトリガーのリリースワークフローによって公開する。バイナリはバージョンを埋め込み、それは git タグと一致しなければならない。
+- chart の `Chart.yaml` はリリースの人間可読な記録であり、その `version`（先頭 `v` なしの SemVer）と `appVersion`（バイナリに合わせ先頭 `v` を保持）は git タグと一致しなければならない。リリースガードがこれを検証し、不一致の場合は早期に失敗するため、公開される chart は `main` にコミットされたものと厳密に一致する。
 - Apache License 2.0 の下でライセンスされる。
 
 ## 6.2 ロードマップ
