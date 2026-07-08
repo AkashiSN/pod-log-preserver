@@ -1,15 +1,6 @@
 name: CI
 on:
   pull_request:
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'internal/version/VERSION'
-      - '.golangci.yml'
-      - 'Makefile'
-      - 'aqua.yaml'
-      - '.github/workflows/ci.yaml'
   push:
     branches:
       - main
@@ -18,41 +9,64 @@ on:
 permissions:
   contents: read
 
-# The Go toolchain and golangci-lint come from aqua (aqua.yaml) — there is no
-# actions/setup-go or golangci-lint-action. aqua-installer installs aqua and
-# links the commands; `make` lazily installs each pinned version (incl. go) on
-# first use. The cache persists the Go module/build cache and aqua's tool store
-# across runs. This resolves the golangci-lint/go version-skew dance the old
-# lint job papered over with install-mode: goinstall: the pinned golangci-lint
-# is a release built with a new-enough Go (see aqua.yaml).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The Go toolchain, golangci-lint, and helm all come from aqua (aqua.yaml) —
+# there is no actions/setup-go, golangci-lint-action, or azure/setup-helm.
+# aqua-installer installs aqua and links the commands; `make` lazily installs
+# each pinned version (incl. go) on first use. The cache persists the Go
+# module/build cache and aqua's tool store across runs.
+#
+# Change classification: the `changes` job runs a unit-tested classifier and
+# each downstream job `needs:` it, gating its heavy steps with `if:`. The job
+# itself always runs, so a required status check always reports a real
+# conclusion and never hangs `pending` the way a path-filtered workflow would.
+# On push to main (or workflow_dispatch) every flag is true.
 jobs:
-  build-test:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.detect.outputs.go }}
+      chart: ${{ steps.detect.outputs.chart }}
+      docker: ${{ steps.detect.outputs.docker }}
+      infra: ${{ steps.detect.outputs.infra }}
     steps:
       - uses: actions/checkout@v6
-      - uses: aquaproj/aqua-installer@v4.0.4
         with:
-          aqua_version: v2.60.1
-      - name: Cache Go + aqua tools
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/.local/share/aquaproj-aqua
-          key: ci-${{ runner.os }}-${{ hashFiles('go.sum', 'aqua.yaml') }}
-          restore-keys: ci-${{ runner.os }}-
-      - run: make build
-      - run: make test
+          # Full history so the diff can reach the PR base commit.
+          fetch-depth: 0
+      - name: Self-test the change classifier
+        run: bash .github/scripts/detect-ci-changes.test.sh
+      - name: Detect changed paths
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "event=${{ github.event_name }} → running all jobs"
+            printf 'go=true\nchart=true\ndocker=true\ndocs=true\ninfra=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$BASE_SHA" HEAD \
+            | tee /dev/stderr \
+            | bash .github/scripts/detect-ci-changes.sh >> "$GITHUB_OUTPUT"
+          echo "--- classification ---"; cat "$GITHUB_OUTPUT"
 
   lint:
     runs-on: ubuntu-latest
+    needs: changes
     steps:
       - uses: actions/checkout@v6
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
       - uses: aquaproj/aqua-installer@v4.0.4
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
         with:
           aqua_version: v2.60.1
       - name: Cache Go + aqua tools
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -61,4 +75,131 @@ jobs:
             ~/.local/share/aquaproj-aqua
           key: ci-${{ runner.os }}-${{ hashFiles('go.sum', 'aqua.yaml') }}
           restore-keys: ci-${{ runner.os }}-
-      - run: make lint
+      - name: golangci-lint
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
+        run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: changes
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
+      - uses: aquaproj/aqua-installer@v4.0.4
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
+        with:
+          aqua_version: v2.60.1
+      - name: Cache Go + aqua tools
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.local/share/aquaproj-aqua
+          key: ci-${{ runner.os }}-${{ hashFiles('go.sum', 'aqua.yaml') }}
+          restore-keys: ci-${{ runner.os }}-
+      - name: build
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
+        run: make build
+      - name: test
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.infra == 'true'
+        run: make test
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: changes
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
+      - uses: docker/setup-qemu-action@v3
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
+      - uses: docker/setup-buildx-action@v3
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
+      # Same multi-arch build as the release (release.yaml), but push: false —
+      # proves the pure-Go cross-compile and the distroless-static runtime
+      # assemble for both architectures without publishing anything.
+      - name: Build multi-arch image (no push)
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+
+  chart:
+    runs-on: ubuntu-latest
+    needs: changes
+    steps:
+      - uses: actions/checkout@v6
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+      # helm is pinned in aqua.yaml (v4 line) and resolved from $PATH; no
+      # azure/setup-helm. This is the same helm the release workflow packages with.
+      - uses: aquaproj/aqua-installer@v4.0.4
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+        with:
+          aqua_version: v2.60.1
+      - name: Lint chart
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+        run: helm lint charts/pod-log-preserver
+      # Render with default values to catch template/schema errors that lint misses.
+      - name: Render chart templates
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+        run: helm template pod-log-preserver charts/pod-log-preserver
+      # Rendered-manifest content assertions: prove the load-bearing invariants
+      # (two hostPath mounts, root securityContext, cleanup/age env wiring)
+      # match the spec, not just that the chart renders.
+      # --verify=false skips Helm 4's plugin provenance check (helm is pinned to
+      # the v4 line in aqua.yaml; the helm-unittest release ships no .prov).
+      - name: Install helm-unittest plugin
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+        run: helm plugin install --verify=false https://github.com/helm-unittest/helm-unittest --version v1.1.1
+      - name: helm unittest
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+        run: helm unittest charts/pod-log-preserver
+      # values.schema.json negative cases: each invalid value MUST be rejected by
+      # `helm template` (the schema is validated at render time). Expected-to-fail
+      # renders — the step fails if any bad value renders, and a sanity check
+      # guards against a broken assertion harness by requiring defaults to render.
+      - name: values.schema.json rejects invalid values
+        if: needs.changes.outputs.chart == 'true' || needs.changes.outputs.infra == 'true'
+        run: |
+          set -euo pipefail
+          chart=charts/pod-log-preserver
+          assert_rejected() {
+            local desc="$1"; shift
+            if helm template plp "$chart" "$@" >/dev/null 2>&1; then
+              echo "FAIL: schema accepted invalid value: $desc ($*)" >&2
+              exit 1
+            fi
+            echo "ok: rejected $desc"
+          }
+          # sanity: the defaults MUST render (guards against a broken harness)
+          helm template plp "$chart" >/dev/null
+          echo "ok: defaults render"
+          assert_rejected "unknown top-level key (additionalProperties:false)" \
+            --set bogusKey=1
+          assert_rejected "unknown config key / typo (additionalProperties:false)" \
+            --set config.logLevle=info
+          assert_rejected "image.pullPolicy not in enum" \
+            --set image.pullPolicy=Sometimes
+          assert_rejected "prometheusScrape is not a boolean" \
+            --set prometheusScrape=notabool
+          assert_rejected "config.metricsPort out of range (1..65535)" \
+            --set config.metricsPort=70000
+          assert_rejected "config.metricsPort non-numeric" \
+            --set config.metricsPort=abc
+          # Empty metricsPort must be rejected: unlike the env-only intervals it
+          # also renders into the container's containerPort, and an empty value
+          # there is an invalid manifest that helm lint/template would still pass.
+          assert_rejected "config.metricsPort empty (renders an invalid containerPort)" \
+            --set config.metricsPort=
+          assert_rejected "config.cleanupIntervalSec=0 (must be a positive integer)" \
+            --set config.cleanupIntervalSec=0
+          assert_rejected "config.watchDir empty (minLength 1)" \
+            --set config.watchDir=
+          assert_rejected "hostPaths unknown key (additionalProperties:false)" \
+            --set hostPaths.hostLogDirr=/x
+          assert_rejected "updateStrategy.type not in enum" \
+            --set updateStrategy.type=Bogus
