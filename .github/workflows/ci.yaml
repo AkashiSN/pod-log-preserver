@@ -8,6 +8,7 @@ on:
       - 'internal/version/VERSION'
       - '.golangci.yml'
       - 'Makefile'
+      - 'aqua.yaml'
       - '.github/workflows/ci.yaml'
   push:
     branches:
@@ -17,32 +18,47 @@ on:
 permissions:
   contents: read
 
+# The Go toolchain and golangci-lint come from aqua (aqua.yaml) — there is no
+# actions/setup-go or golangci-lint-action. aqua-installer installs aqua and
+# links the commands; `make` lazily installs each pinned version (incl. go) on
+# first use. The cache persists the Go module/build cache and aqua's tool store
+# across runs. This resolves the golangci-lint/go version-skew dance the old
+# lint job papered over with install-mode: goinstall: the pinned golangci-lint
+# is a release built with a new-enough Go (see aqua.yaml).
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v5
+      - uses: aquaproj/aqua-installer@v4.0.4
         with:
-          go-version-file: go.mod
-          cache: true
-      - run: go build ./...
-      - run: go test -race ./...
+          aqua_version: v2.60.1
+      - name: Cache Go + aqua tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.local/share/aquaproj-aqua
+          key: ci-${{ runner.os }}-${{ hashFiles('go.sum', 'aqua.yaml') }}
+          restore-keys: ci-${{ runner.os }}-
+      - run: make build
+      - run: make test
 
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-go@v5
+      - uses: aquaproj/aqua-installer@v4.0.4
         with:
-          go-version-file: go.mod
-      # golangci-lint v2 (this repo's .golangci.yml is version "2") requires
-      # golangci-lint-action v7; v6 rejects v2.x version strings. Use
-      # install-mode: goinstall so golangci-lint is built with the setup-go
-      # toolchain (matching go.mod's go directive) -- the prebuilt release
-      # binaries lag the Go version and are refused when go.mod targets a newer
-      # Go than they were built with.
-      - uses: golangci/golangci-lint-action@v7
+          aqua_version: v2.60.1
+      - name: Cache Go + aqua tools
+        uses: actions/cache@v4
         with:
-          version: v2.1.6
-          install-mode: goinstall
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/.local/share/aquaproj-aqua
+          key: ci-${{ runner.os }}-${{ hashFiles('go.sum', 'aqua.yaml') }}
+          restore-keys: ci-${{ runner.os }}-
+      - run: make lint
