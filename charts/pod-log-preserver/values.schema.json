@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "pod-log-preserver values",
+  "description": "Install-time validation of the chart values, checked by Helm at template/lint/install time. It is a fast first line of defense against typos and out-of-range inputs before they reach the cluster; the binary re-validates its own numeric config at startup and fails fast (spec §5.4). additionalProperties:false is applied where an unknown key is almost certainly a typo (top level, config, image, hostPaths, updateStrategy); free-form Kubernetes pass-through maps (annotations, labels, securityContext, affinity, ...) stay open.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "prometheusScrape": { "type": "boolean" },
+    "podAnnotations": { "type": "object", "additionalProperties": { "type": "string" } },
+    "podLabels": { "type": "object", "additionalProperties": { "type": "string" } },
+    "commonAnnotations": { "type": "object", "additionalProperties": { "type": "string" } },
+    "commonLabels": { "type": "object", "additionalProperties": { "type": "string" } },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watchDir": { "type": "string", "minLength": 1 },
+        "preserveDir": { "type": "string", "minLength": 1 },
+        "cleanupIntervalSec": { "$ref": "#/definitions/positiveIntOrEmpty" },
+        "cleanupMaxAgeMin": { "$ref": "#/definitions/positiveIntOrEmpty" },
+        "cleanupGzMaxAgeMin": { "$ref": "#/definitions/positiveIntOrEmpty" },
+        "resyncIntervalSec": { "$ref": "#/definitions/positiveIntOrEmpty" },
+        "namespaceFilter": {
+          "type": "string",
+          "description": "Comma-separated glob patterns; empty means all namespaces."
+        },
+        "logLevel": {
+          "type": "string",
+          "description": "\"debug\" or \"info\"; any other value shows only warn/error (spec §5)."
+        },
+        "metricsPort": {
+          "anyOf": [
+            { "type": "integer", "minimum": 1, "maximum": 65535 },
+            { "type": "string", "enum": [""] }
+          ],
+          "description": "A bindable TCP port (1..65535); empty falls back to the binary default. The binary rejects an out-of-range port at startup (spec §5.4)."
+        },
+        "preservedLogDBGlob": {
+          "type": "string",
+          "description": "Glob for the fluent-bit tail DBs; empty disables DB-aware cleanup."
+        }
+      }
+    },
+    "extraEnv": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "hostPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostLogDir", "fluentBitDBDir"],
+      "properties": {
+        "hostLogDir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must contain both config.watchDir and config.preserveDir so preservation hardlinks stay on one filesystem."
+        },
+        "fluentBitDBDir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory of the fluent-bit tail DBs, mounted read-write for the WAL -shm wal-index."
+        }
+      }
+    },
+    "resources": { "type": "object" },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "tolerations": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
+    "affinity": { "type": "object" },
+    "updateStrategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["RollingUpdate", "OnDelete"] },
+        "rollingUpdate": { "type": "object" }
+      }
+    },
+    "priorityClassName": { "type": "string" },
+    "automountServiceAccountToken": { "type": "boolean" }
+  },
+  "definitions": {
+    "positiveIntOrEmpty": {
+      "anyOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "string", "enum": [""] }
+      ],
+      "description": "A positive integer, or an empty string to fall back to the binary default. The binary rejects a non-positive value at startup (spec §5.4)."
+    }
+  }
+}

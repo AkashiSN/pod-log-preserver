@@ -94,3 +94,8 @@ flowchart LR
 また `METRICS_PORT` は `1..65535` の範囲でなければならない。ロード時の検証（§5.2 ステップ 1）が
 範囲外の値を、該当キーを明示した fail-fast エラーで拒否するため、ticker の panic として
 遅れて顕在化することはない。
+
+Helm chart はこれらの制約を
+`charts/pod-log-preserver/values.schema.json` に反映しており、Helm が
+template / install 時に検証する。そのためキーのタイポや範囲外の値はクラスタに
+到達する前に拒否される —— バイナリのロード時検証に先立つ、素早い第一の防御線である。

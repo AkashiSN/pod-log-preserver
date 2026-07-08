@@ -68,3 +68,54 @@ jobs:
       # alone misses.
       - name: Render chart templates
         run: helm template pod-log-preserver charts/pod-log-preserver
+
+      # Rendered-manifest content assertions: prove the load-bearing invariants
+      # (two hostPath mounts, root securityContext, cleanup/age env wiring,
+      # downward-API identity) match the spec, not just that the chart renders.
+      # --verify=false skips Helm 4's plugin provenance check (helm is pinned to
+      # the v4 line in aqua.yaml; the helm-unittest release ships no .prov).
+      - name: Install helm-unittest plugin
+        run: helm plugin install --verify=false https://github.com/helm-unittest/helm-unittest --version v1.1.1
+
+      - name: helm unittest
+        run: helm unittest charts/pod-log-preserver
+
+      # values.schema.json negative cases: each invalid value MUST be rejected by
+      # `helm template` (the schema is validated at render time). Expected-to-fail
+      # renders — the step fails if any bad value renders, and a sanity check
+      # guards against a broken assertion harness by requiring defaults to render.
+      - name: values.schema.json rejects invalid values
+        run: |
+          set -euo pipefail
+          chart=charts/pod-log-preserver
+          assert_rejected() {
+            local desc="$1"; shift
+            if helm template plp "$chart" "$@" >/dev/null 2>&1; then
+              echo "FAIL: schema accepted invalid value: $desc ($*)" >&2
+              exit 1
+            fi
+            echo "ok: rejected $desc"
+          }
+          # sanity: the defaults MUST render (guards against a broken harness)
+          helm template plp "$chart" >/dev/null
+          echo "ok: defaults render"
+          assert_rejected "unknown top-level key (additionalProperties:false)" \
+            --set bogusKey=1
+          assert_rejected "unknown config key / typo (additionalProperties:false)" \
+            --set config.logLevle=info
+          assert_rejected "image.pullPolicy not in enum" \
+            --set image.pullPolicy=Sometimes
+          assert_rejected "prometheusScrape is not a boolean" \
+            --set prometheusScrape=notabool
+          assert_rejected "config.metricsPort out of range (1..65535)" \
+            --set config.metricsPort=70000
+          assert_rejected "config.metricsPort non-numeric" \
+            --set config.metricsPort=abc
+          assert_rejected "config.cleanupIntervalSec=0 (must be a positive integer)" \
+            --set config.cleanupIntervalSec=0
+          assert_rejected "config.watchDir empty (minLength 1)" \
+            --set config.watchDir=
+          assert_rejected "hostPaths unknown key (additionalProperties:false)" \
+            --set hostPaths.hostLogDirr=/x
+          assert_rejected "updateStrategy.type not in enum" \
+            --set updateStrategy.type=Bogus
