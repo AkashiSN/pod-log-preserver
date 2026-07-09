@@ -2,6 +2,9 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ include "pod-log-preserver.fullname" . }}
+  # `helm install` injects the release namespace, `helm template` does not; render
+  # it so GitOps flows never apply a namespace-less DaemonSet.
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "pod-log-preserver.labels" . | nindent 4 }}
   {{- with .Values.commonAnnotations }}

@@ -17,6 +17,19 @@ tests:
       - equal:
           path: spec.template.spec.automountServiceAccountToken
           value: false
+      # Rendered unconditionally: `helm install` would inject it, but `helm
+      # template` does not, and a namespace-less manifest lands wherever the
+      # applying client defaults to.
+      - exists:
+          path: metadata.namespace
+
+  - it: renders the release namespace, so helm template output is not namespace-less
+    release:
+      namespace: kube-system
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: kube-system
 
   - it: runs the container as root (uid/gid 0)
     asserts:
