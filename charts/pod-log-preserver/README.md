@@ -51,6 +51,18 @@ helm install pod-log-preserver ./charts/pod-log-preserver \
 The chart has no namespaced RBAC or ServiceAccount token; pick the install
 namespace with `--namespace`.
 
+The DaemonSet renders its own `metadata.namespace` from the release namespace, so
+rendering the chart yourself needs `--namespace` too — `helm template` does not
+inject it the way `helm install` does:
+
+```bash
+helm template pod-log-preserver ./charts/pod-log-preserver \
+  --namespace kube-system | kubectl apply -f -
+```
+
+Argo CD (`destination.namespace`), Flux (`HelmRelease.spec.targetNamespace`), and
+helmfile all set the release namespace themselves, so they need no extra wiring.
+
 ## Uninstalling
 
 ```bash
