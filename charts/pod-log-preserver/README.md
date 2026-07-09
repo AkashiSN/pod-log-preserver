@@ -18,7 +18,7 @@ for the full design.
 
 ```bash
 helm install pod-log-preserver \
-  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.0 \
+  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.1 \
   --namespace kube-system
 ```
 
@@ -40,7 +40,7 @@ workflow.
 ```bash
 # From the published OCI registry (recommended)
 helm install pod-log-preserver \
-  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.0 \
+  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.1 \
   --namespace kube-system
 
 # From a local checkout

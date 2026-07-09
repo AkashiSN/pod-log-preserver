@@ -1,7 +1,7 @@
 # pod-log-preserver
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-v0.5.0_released-brightgreen.svg)](docs/ja/specification/)
+[![Status](https://img.shields.io/badge/status-v0.5.1_released-brightgreen.svg)](docs/ja/specification/)
 
 EKS Auto Mode 上で kubelet がローテートした Pod ログを、ログエージェントが収集し終えるまで保全し、その後ディスクを自動で回収するツール。
 
@@ -34,7 +34,7 @@ flowchart TD
 
 ```bash
 helm install pod-log-preserver \
-  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.0 \
+  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.1 \
   --namespace kube-system
 ```
 
