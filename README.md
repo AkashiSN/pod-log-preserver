@@ -1,7 +1,7 @@
 # pod-log-preserver
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-v0.5.0_released-brightgreen.svg)](docs/specification/)
+[![Status](https://img.shields.io/badge/status-v0.5.1_released-brightgreen.svg)](docs/specification/)
 
 Preserve kubelet-rotated pod logs on EKS Auto Mode until a log agent has
 collected them — then reclaim the disk automatically.
@@ -44,7 +44,7 @@ by the release workflow. Install the DaemonSet with:
 
 ```bash
 helm install pod-log-preserver \
-  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.0 \
+  oci://ghcr.io/akashisn/charts/pod-log-preserver --version 0.5.1 \
   --namespace kube-system
 ```
 
