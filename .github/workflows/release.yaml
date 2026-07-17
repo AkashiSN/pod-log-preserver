@@ -98,7 +98,7 @@ jobs:
       # azure/setup-helm, so local packaging and this release path use the same helm.
       - uses: aquaproj/aqua-installer@v4.0.5
         with:
-          aqua_version: v2.60.1
+          aqua_version: v2.62.0
 
       - name: Helm registry login
         run: |
