@@ -20,7 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Full history so the diff can reach the PR base commit.
           fetch-depth: 0
@@ -39,7 +39,7 @@ jobs:
             | tee /dev/stderr \
             | bash .github/scripts/detect-ci-changes.sh >> "$GITHUB_OUTPUT"
           echo "--- classification ---"; cat "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.detect.outputs.docs == 'true' || steps.detect.outputs.infra == 'true'
         with:
           node-version: 24
