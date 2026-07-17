@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "github>aquaproj/aqua-renovate-config#2.13.0"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "description": "Bump the Go toolchain in one PR across go.mod, the Dockerfile, and aqua.yaml. The check-go-toolchain-sync.sh CI guard still fails the build if any of the three pins drifts out of sync.",
+      "groupName": "go-toolchain",
+      "matchDepNames": [
+        "go",
+        "golang",
+        "golang/go"
+      ]
+    }
+  ]
+}
