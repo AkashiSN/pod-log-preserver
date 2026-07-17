@@ -6,7 +6,7 @@
 # for reproducibility. When bumping the go.mod Go version, update this tag and
 # re-resolve the digest:
 #   docker buildx imagetools inspect golang:<ver>-bookworm --format '{{.Manifest.Digest}}'
-FROM --platform=$BUILDPLATFORM golang:1.26.4-bookworm@sha256:b305420a68d0f229d91eb3b3ed9e519fcf2cf5461da4bef997bf927e8c0bfd2b AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.5-bookworm@sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651 AS build
 
 WORKDIR /src
 
@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # root, so the distroless `nonroot` tag must not be used. Pinned by digest for
 # reproducibility; re-resolve when bumping:
 #   docker buildx imagetools inspect gcr.io/distroless/static-debian12:latest --format '{{.Manifest.Digest}}'
-FROM gcr.io/distroless/static-debian12:latest@sha256:9c346e4be81b5ca7ff31a0d89eaeade58b0f95cfd3baed1f36083ddb47ca3160
+FROM gcr.io/distroless/static-debian12:latest@sha256:61b7ccecebc7c474a531717de80a94709d20547cdcdaf740c25876f2a8e38b44
 
 COPY --from=build /pod-log-preserver /pod-log-preserver
 
