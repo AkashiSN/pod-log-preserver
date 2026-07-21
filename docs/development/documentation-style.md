@@ -277,7 +277,7 @@ After editing, review the diff as a reader and verify that:
 Run the checks relevant to the changed files:
 
 ```bash
-make docs-build    # or: npm run docs:build (from docs/)
+npm run docs:build    # VitePress build with dead-link check (from repo root)
 git diff --check
 ```
 
