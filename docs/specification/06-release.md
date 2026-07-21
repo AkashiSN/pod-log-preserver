@@ -19,7 +19,7 @@
 
 ## 6.2 Roadmap
 
-- **v0.5.0 — first public release.** Feature parity with the internal
+- **v0.5.0 — first public release (shipped).** Feature parity with the internal
   predecessor, re-platformed onto a pure-Go SQLite driver
   (`modernc.org/sqlite`) and a distroless static image. Deliverables: the Go
   program, `Dockerfile`, Helm chart, and the tag-triggered release CI, each

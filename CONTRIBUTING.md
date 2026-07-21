@@ -1,9 +1,8 @@
 # Contributing to pod-log-preserver
 
-Thanks for your interest! This project is in its **initial OSS bootstrap**
-phase: the development process and the specification are in place, and the
-implementation is being built issue-first toward the first release, `v0.5.0`.
-Feedback on the design is welcome via Issues.
+Thanks for your interest! This project has shipped its first public release
+(`v0.5.0`) and continues to evolve issue-first. Feedback on the design is
+welcome via Issues.
 
 ## Ways to contribute
 

@@ -26,7 +26,7 @@ helm install pod-log-preserver \
 
 - Kubernetes cluster (built for **EKS Auto Mode**, but works anywhere the
   kubelet writes `/var/log/pods` and fluent-bit tails it).
-- Helm 3.8+ (for OCI registry support).
+- Helm v4.
 - A log agent — **fluent-bit** — running on the same nodes, writing a tail DB
   under `hostPaths.fluentBitDBDir` (default `/var/lib/fluent-bit`).
 - The node's watch and preserve directories must live on the **same

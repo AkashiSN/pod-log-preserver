@@ -45,6 +45,7 @@ export default withMermaid(defineConfig({
         nav: [
           { text: 'Getting Started', link: '/getting-started' },
           { text: 'Specification', link: '/specification/' },
+          { text: 'Development', link: '/development/ci-cd' },
         ],
         sidebar: [
           { text: 'Overview', collapsed: false, items: [
@@ -60,6 +61,10 @@ export default withMermaid(defineConfig({
             { text: '6. Release', link: '/specification/06-release' },
             { text: '7. Risks & Status', link: '/specification/07-risks' },
           ]},
+          { text: 'Development', collapsed: false, items: [
+            { text: 'CI/CD Design', link: '/development/ci-cd' },
+            { text: 'Documentation Style', link: '/development/documentation-style' },
+          ]},
         ],
       },
     },
@@ -71,6 +76,7 @@ export default withMermaid(defineConfig({
         nav: [
           { text: 'はじめに', link: '/ja/getting-started' },
           { text: '仕様書', link: '/ja/specification/' },
+          { text: '開発者向け', link: '/development/ci-cd' },
         ],
         sidebar: [
           { text: '概要', collapsed: false, items: [
@@ -85,6 +91,10 @@ export default withMermaid(defineConfig({
             { text: '5. 実装', link: '/ja/specification/05-implementation' },
             { text: '6. リリース', link: '/ja/specification/06-release' },
             { text: '7. リスクと状況', link: '/ja/specification/07-risks' },
+          ]},
+          { text: '開発', collapsed: false, items: [
+            { text: 'CI/CD 設計（英語）', link: '/development/ci-cd' },
+            { text: 'ドキュメントスタイル（英語）', link: '/development/documentation-style' },
           ]},
         ],
       },

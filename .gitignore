@@ -38,6 +38,3 @@ charts/*/Chart.lock
 node_modules/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
-# Generated at build time from the root READMEs (see copy-readme.mjs)
-docs/getting-started.md
-docs/ja/getting-started.md

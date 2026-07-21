@@ -5,7 +5,7 @@
 | # | Risk | Mitigation |
 |---|------|-----------|
 | 1 | Preserve and watch dirs on different filesystems → hardlinks impossible | Startup hardlink test fails fast before any work begins (§4.1). |
-| 2 | A preserved file is deleted before the agent finishes reading it | Deletion is confirmation-first: an orphan is removed only when a tail DB shows offset ≥ size, else it waits for the age threshold (§3.2–3.3). |
+| 2 | A preserved file is deleted before the agent finishes reading it | Deletion is confirmation-first: an orphan is removed only when a tail DB shows offset ≥ size, else it waits for the age threshold (§3.2–§3.3). |
 | 3 | inode-number collision matches an unrelated file in the tail DB | The recorded `name` must also end with `/<relPath>`, anchoring the match on a path boundary (§3.2). |
 | 4 | inotify queue overflow drops events | A queue-overflow event triggers a full resync; a periodic resync also runs unconditionally (§5.1). |
 | 5 | A new tail input's slow first discovery races a deletion | A file becomes an orphan only several rotation cycles after hardlinking, by which time a sub-second-refresh agent has discovered it; new inputs must share the DB glob (§3.2). |

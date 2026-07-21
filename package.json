@@ -3,11 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predocs:dev": "node docs/.vitepress/scripts/copy-readme.mjs",
     "docs:dev": "vitepress dev docs",
-    "predocs:build": "node docs/.vitepress/scripts/copy-readme.mjs",
     "docs:build": "vitepress build docs",
-    "predocs:preview": "node docs/.vitepress/scripts/copy-readme.mjs",
     "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
