@@ -57,7 +57,7 @@ jobs:
       - uses: aquaproj/aqua-installer@v4.0.5
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         with:
-          aqua_version: v2.62.0
+          aqua_version: v2.62.1
       - name: Cache Go + aqua tools
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         uses: actions/cache@v6
@@ -81,7 +81,7 @@ jobs:
       - uses: aquaproj/aqua-installer@v4.0.5
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         with:
-          aqua_version: v2.62.0
+          aqua_version: v2.62.1
       - name: Cache Go + aqua tools
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         uses: actions/cache@v6
