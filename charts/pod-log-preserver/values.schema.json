@@ -41,7 +41,7 @@
         },
         "logLevel": {
           "type": "string",
-          "description": "\"debug\" or \"info\"; any other value shows only warn/error (spec §5)."
+          "description": "\"debug\" or \"info\"; any other value shows only warn/error (spec §5.4)."
         },
         "metricsPort": {
           "type": "integer",

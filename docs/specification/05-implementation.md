@@ -96,7 +96,7 @@ using `SELECT *`, additive schema changes do not affect it.
 | --- | --- | --- |
 | **1.x – 4.x** (every released major) | `id, name, offset, inode, created, rotated` | **supported** — the schema is byte-for-byte identical across these majors (verified against `plugins/in_tail/tail_sql.h` at `v1.9.10`, `v2.2.3`, `v3.0.7`, `v3.1.9`, `v3.2.0`, `v4.0.0`, `v4.2.3`) |
 | **5.x** (`v5.0.0` and later) | the above **+** `offset_marker`, `offset_marker_size` | **supported** — the two added columns are ignored by the named-column query (verified against `tail_sql.h` at `v5.0.9`) |
-| a DB missing `inode`, or a non-fluent-bit schema | unrecognized | the query errors; it is counted (`fluentbit_db_errors_total`), the DB is skipped, and its orphans fall back to age-based cleanup |
+| a DB missing `inode`, or a non-fluent-bit schema | unrecognized | the query errors; it is counted (`pod_log_preserver_fluentbit_db_errors_total`), the DB is skipped, and its orphans fall back to age-based cleanup |
 
 The e2e harness pins `fluent/fluent-bit:3.1.9` as the live-validated version;
 the version-independence in the table is pinned by a unit-test support matrix

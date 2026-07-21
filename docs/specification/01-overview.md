@@ -45,7 +45,7 @@ read, losing those lines permanently.
 `pod-log-preserver` sits beside the log agent, not in its path. The kubelet
 writes logs under `/var/log/pods`; the agent tails them; `pod-log-preserver`
 hardlinks them aside and, by reading the agent's own progress DB read-only,
-deletes each preserved copy only once the agent has finished with it.
+deletes each preserved link only once the agent has finished with it.
 
 ```mermaid
 flowchart TD
@@ -64,5 +64,5 @@ The numbered edges are the end-to-end flow: the kubelet writes and rotates logs
 (①); `pod-log-preserver` watches them (②) and hardlinks each aside, sharing the
 inode (③); fluent-bit tails both the live and preserved trees (④) and records
 its read offset per inode in its tail DB (⑤); `pod-log-preserver` reads that DB
-read-only (⑥) and deletes a preserved copy only once the recorded offset has
+read-only (⑥) and deletes a preserved link only once the recorded offset has
 reached the file size (⑦).

@@ -15,12 +15,8 @@ The **source of truth for design** is [`docs/specification/`](docs/specification
 (Japanese translation: [`docs/ja/specification/`](docs/ja/specification/)).
 Read it before making design-affecting changes.
 
-The project is in its **initial OSS bootstrap** phase: this repository currently
-carries the development-process foundation and the specification. The
-implementation (the Go program, `Dockerfile`, Helm chart, and release CI) is
-built later, issue-first, targeting the first public release `v0.5.0` (feature
-parity with the internal predecessor, on a new runtime: `modernc.org/sqlite` +
-distroless static). The specification is the source of truth — keep code and
+The project has shipped its first public release (`v0.5.0`) and continues to
+evolve issue-first. The specification is the source of truth — keep code and
 spec in sync (see *Specification rules* below).
 
 ## Development process
