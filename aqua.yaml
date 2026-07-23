@@ -41,4 +41,4 @@ packages:
   # kind runs a single-node cluster in Docker; the pinned node image below
   # matches this kind minor. kubectl tracks the node's Kubernetes minor.
   - name: kubernetes-sigs/kind@v0.32.0
-  - name: kubernetes/kubernetes/kubectl@v1.36.2
+  - name: kubernetes/kubernetes/kubectl@v1.36.3
