@@ -19,7 +19,7 @@
 # CI's aqua-installer needs no policy_allow.
 registries:
   - type: standard
-    ref: v4.540.0 # renovate: depName=aquaproj/aqua-registry
+    ref: v4.542.0 # renovate: depName=aquaproj/aqua-registry
 packages:
   # The Go toolchain itself is pinned so local `make` and CI use the exact same
   # compiler (no actions/setup-go). MUST stay in sync with the `go` directive in
