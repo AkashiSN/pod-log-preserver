@@ -26,7 +26,7 @@ packages:
   # go.mod — bump both together (the check-go-toolchain-sync.sh CI guard enforces
   # this), or Go's GOTOOLCHAIN=auto will silently download a newer toolchain and
   # bypass this pin.
-  - name: golang/go@go1.26.5
+  - name: golang/go@go1.27.1
   # golangci-lint v2 line — matches this repo's .golangci.yml (config version
   # "2"). The pinned version must be a release whose prebuilt binary was built
   # with a Go >= go.mod's minor: golangci-lint refuses to run when its build Go
