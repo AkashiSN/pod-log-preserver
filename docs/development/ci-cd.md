@@ -168,3 +168,33 @@ byte-identical tools.
 | `helm/helm` | `v4.2.3` | Chart lint, template, package |
 | `kubernetes-sigs/kind` | `v0.32.0` | e2e kind cluster |
 | `kubernetes/kubectl` | `v1.36.2` | e2e cluster interaction |
+
+## Dependency updates: Renovate groups
+
+Renovate (`.github/renovate.json`) opens the dependency PRs. Its `packageRules`
+exist for one reason: some of the pins above are **coupled**, and a PR that
+moves one without the others cannot pass CI. Each group is one PR.
+
+| Group | Members | Why they travel together |
+|---|---|---|
+| `go stack` | `gomod` (module requires + the `go` directive), `dockerfile` (golang builder + distroless runtime), `golang/go`, `golangci/golangci-lint` | The Go version is pinned in three places (`go.mod`, `Dockerfile`, `aqua.yaml`) and `check-go-toolchain-sync.sh` fails the build if they disagree. golangci-lint refuses to run when its own build Go minor is older than the module's. |
+| `e2e cluster` | `kubernetes-sigs/kind`, `kubernetes/kubernetes/kubectl` | The `kindest/node` tag in `test/e2e/kind/kind.yaml` must match kind's compiled-in default, and kubectl tracks that node's Kubernetes minor. |
+| `dev tooling` | `aquaproj/aqua`, `aquaproj/aqua-registry`, `aquaproj/aqua-renovate-config`, `helm/helm` | Not coupled to anything — batched only to cut PR volume. |
+| `docs site` | `npm` (vitepress, mermaid, vue, …) | All validated by the same `npm run docs:build`. |
+| `github actions` | `github-actions` | All validated by CI running at all. |
+
+::: warning The `go` directive needs `rangeStrategy: bump`
+`go 1.26.5` in `go.mod` is a *minimum*, not a pin. Under Renovate's default
+`replace` strategy every newer Go still satisfies it, so Renovate proposes no
+update and silently leaves the directive behind while it moves `aqua.yaml` and
+the `Dockerfile` — the exact drift `check-go-toolchain-sync.sh` rejects. The
+`rangeStrategy: "bump"` rule on the `gomod` / `golang` dep type is what makes
+the directive move with the other two pins.
+:::
+
+::: tip Still manual: the kind node image
+Renovate cannot derive `kindest/node`'s tag from any manager, so on a kind bump
+the tag in `test/e2e/kind/kind.yaml` must be re-resolved by hand
+(`strings $(aqua which kind) | grep kindest/node`). Keeping kind in its own
+group confines that manual step to one PR.
+:::

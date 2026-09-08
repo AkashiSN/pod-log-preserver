@@ -9,12 +9,74 @@
   ],
   "packageRules": [
     {
-      "description": "Bump the Go toolchain in one PR across go.mod, the Dockerfile, and aqua.yaml. The check-go-toolchain-sync.sh CI guard still fails the build if any of the three pins drifts out of sync.",
-      "groupName": "go-toolchain",
+      "description": "Every Go module update ships with the toolchain. `gomodTidy` raises go.mod's `go` directive whenever a dependency demands a newer language version, and that alone desynchronizes the three pins check-go-toolchain-sync.sh compares — so a module bump that travels without the toolchain cannot pass CI.",
+      "groupName": "go stack",
+      "matchManagers": [
+        "gomod"
+      ]
+    },
+    {
+      "description": "go.mod's `go` directive is a MINIMUM, so under the default `replace` strategy every newer Go still satisfies it and Renovate offers no update at all — which is why #83 moved aqua.yaml and the Dockerfile to 1.27.1, left go.mod on 1.26.5, and failed check-go-toolchain-sync.sh. `bump` is what makes the directive move with them.",
+      "groupName": "go stack",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "golang"
+      ],
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "Both Dockerfile base images: the golang builder stage (the second of the three Go toolchain pins) and the distroless runtime, re-resolved by digest together.",
+      "groupName": "go stack",
+      "matchManagers": [
+        "dockerfile"
+      ]
+    },
+    {
+      "description": "The third Go toolchain pin, as aqua spells it in aqua.yaml.",
+      "groupName": "go stack",
       "matchDepNames": [
-        "go",
-        "golang",
         "golang/go"
+      ]
+    },
+    {
+      "description": "golangci-lint cannot cross a version skew with the toolchain: it refuses to run when its own build Go minor is older than the one the module targets (see the pin's comment in aqua.yaml), so it has to travel inside the toolchain's PR.",
+      "groupName": "go stack",
+      "matchDepNames": [
+        "golangci/golangci-lint"
+      ]
+    },
+    {
+      "description": "kind and kubectl move together: the `kindest/node` tag in test/e2e/kind/kind.yaml must match kind's compiled-in default, and kubectl tracks that node's Kubernetes minor. Renovate cannot derive the node tag from any manager, so this group's PR is the one that also needs the manual node-image re-resolve — keep that manual step off the other groups.",
+      "groupName": "e2e cluster",
+      "matchDepNames": [
+        "kubernetes-sigs/kind",
+        "kubernetes/kubernetes/kubectl"
+      ]
+    },
+    {
+      "description": "aqua itself (the `aqua_version` the installer takes), the registry it resolves packages from, this config's own preset, and helm. None of them is coupled to the Go toolchain or to the e2e cluster, so they batch into one PR instead of one each.",
+      "groupName": "dev tooling",
+      "matchDepNames": [
+        "aquaproj/aqua",
+        "aquaproj/aqua-registry",
+        "aquaproj/aqua-renovate-config",
+        "helm/helm"
+      ]
+    },
+    {
+      "description": "The docs site's npm dependencies. Every one of them is exercised by the same `npm run docs:build`, so splitting them buys nothing but CI minutes.",
+      "groupName": "docs site",
+      "matchManagers": [
+        "npm"
+      ]
+    },
+    {
+      "description": "Workflow actions batch together; they share one validation — CI running at all.",
+      "groupName": "github actions",
+      "matchManagers": [
+        "github-actions"
       ]
     }
   ]
