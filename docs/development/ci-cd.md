@@ -178,7 +178,7 @@ moves one without the others cannot pass CI. Each group is one PR.
 | Group | Members | Why they travel together |
 |---|---|---|
 | `go stack` | `gomod` (module requires + the `go` directive), `dockerfile` (golang builder + distroless runtime), `golang/go`, `golangci/golangci-lint` | The Go version is pinned in three places (`go.mod`, `Dockerfile`, `aqua.yaml`) and `check-go-toolchain-sync.sh` fails the build if they disagree. golangci-lint refuses to run when its own build Go minor is older than the module's. |
-| `e2e cluster` | `kubernetes-sigs/kind`, `kubernetes/kubernetes/kubectl` | The `kindest/node` tag in `test/e2e/kind/kind.yaml` must match kind's compiled-in default, and kubectl tracks that node's Kubernetes minor. |
+| `e2e cluster` | `kubernetes-sigs/kind`, `kubernetes/kubernetes/kubectl` | Bumping kind changes the cluster's Kubernetes version, and kubectl tracks that node's Kubernetes minor. |
 | `dev tooling` | `aquaproj/aqua`, `aquaproj/aqua-registry`, `aquaproj/aqua-renovate-config`, `helm/helm` | Not coupled to anything — batched only to cut PR volume. |
 | `docs site` | `npm` (vitepress, mermaid, vue, …) | All validated by the same `npm run docs:build`. |
 | `github actions` | `github-actions` | All validated by CI running at all. |
@@ -192,9 +192,17 @@ the `Dockerfile` — the exact drift `check-go-toolchain-sync.sh` rejects. The
 the directive move with the other two pins.
 :::
 
-::: tip Still manual: the kind node image
-Renovate cannot derive `kindest/node`'s tag from any manager, so on a kind bump
-the tag in `test/e2e/kind/kind.yaml` must be re-resolved by hand
-(`strings $(aqua which kind) | grep kindest/node`). Keeping kind in its own
-group confines that manual step to one PR.
+::: tip Why `kind.yaml` pins no node image
+kind's default node image is compiled into the binary and pinned by digest, so
+it already moves in lockstep with the `kubernetes-sigs/kind` version in
+`aqua.yaml`. A tag written into `test/e2e/kind/kind.yaml` would instead have to
+be re-resolved by hand on every bump — no Renovate manager can derive it from
+the kind version — which is exactly the drift that reached `main` in #93.
+Omitting the override removes the coupling rather than documenting it.
+
+To see which node image the pinned kind will use:
+
+```console
+$ strings "$(aqua which kind)" | grep -o 'kindest/node:v[0-9.]*'
+```
 :::
