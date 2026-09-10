@@ -1,7 +1,10 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-# Pinned node image matches the kind version pinned in aqua.yaml (re-resolve
-# from `strings $(aqua which kind) | grep kindest/node` when bumping kind).
+# No `image:` override on purpose. kind's own default node image is compiled
+# into the binary and pinned by digest, so it already moves in lockstep with the
+# kind version in aqua.yaml — while a tag written here would have to be
+# re-resolved by hand on every bump (no Renovate manager can derive it). To see
+# which node image the pinned kind will use:
+#   strings "$(aqua which kind)" | grep -o 'kindest/node:v[0-9.]*'
 nodes:
   - role: control-plane
-    image: kindest/node:v1.36.1

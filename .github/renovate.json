@@ -48,7 +48,7 @@
       ]
     },
     {
-      "description": "kind and kubectl move together: the `kindest/node` tag in test/e2e/kind/kind.yaml must match kind's compiled-in default, and kubectl tracks that node's Kubernetes minor. Renovate cannot derive the node tag from any manager, so this group's PR is the one that also needs the manual node-image re-resolve — keep that manual step off the other groups.",
+      "description": "kind and kubectl move together: bumping kind changes the cluster's Kubernetes version (test/e2e/kind/kind.yaml pins no node image, so kind's digest-pinned compiled-in default applies), and kubectl tracks that node's Kubernetes minor.",
       "groupName": "e2e cluster",
       "matchDepNames": [
         "kubernetes-sigs/kind",
