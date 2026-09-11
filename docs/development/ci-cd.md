@@ -161,13 +161,18 @@ All CLI versions (Go, golangci-lint, helm, kind, kubectl) are pinned in
 lazily installs each pinned version on first use. Local `make` and CI use
 byte-identical tools.
 
-| Tool | Pinned version | Purpose |
-|------|---------------|---------|
-| `golang/go` | `go1.26.5` | Compile and test |
-| `golangci/golangci-lint` | `v2.12.2` | Static analysis |
-| `helm/helm` | `v4.2.3` | Chart lint, template, package |
-| `kubernetes-sigs/kind` | `v0.32.0` | e2e kind cluster |
-| `kubernetes/kubectl` | `v1.36.2` | e2e cluster interaction |
+| Tool | Purpose |
+|------|---------|
+| `golang/go` | Compile and test |
+| `golangci/golangci-lint` | Static analysis |
+| `helm/helm` | Chart lint, template, package |
+| `kubernetes-sigs/kind` | e2e kind cluster |
+| `kubernetes/kubernetes/kubectl` | e2e cluster interaction |
+
+The table deliberately carries no version column. Every one of these pins is
+bumped by Renovate (see below), so a copy written here is stale from the next
+merge onward — and a page claiming `aqua.yaml` is the single source of truth is
+the worst place to keep a second one. Read the versions from `aqua.yaml`.
 
 ## Dependency updates: Renovate groups
 
@@ -184,7 +189,7 @@ moves one without the others cannot pass CI. Each group is one PR.
 | `github actions` | `github-actions` | All validated by CI running at all. |
 
 ::: warning The `go` directive needs `rangeStrategy: bump`
-`go 1.26.5` in `go.mod` is a *minimum*, not a pin. Under Renovate's default
+The `go` directive in `go.mod` is a *minimum*, not a pin. Under Renovate's default
 `replace` strategy every newer Go still satisfies it, so Renovate proposes no
 update and silently leaves the directive behind while it moves `aqua.yaml` and
 the `Dockerfile` — the exact drift `check-go-toolchain-sync.sh` rejects. The
