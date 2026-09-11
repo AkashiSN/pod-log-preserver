@@ -180,7 +180,7 @@ moves one without the others cannot pass CI. Each group is one PR.
 | `go stack` | `gomod` (module requires + the `go` directive), `dockerfile` (golang builder + distroless runtime), `golang/go`, `golangci/golangci-lint` | The Go version is pinned in three places (`go.mod`, `Dockerfile`, `aqua.yaml`) and `check-go-toolchain-sync.sh` fails the build if they disagree. golangci-lint refuses to run when its own build Go minor is older than the module's. |
 | `e2e cluster` | `kubernetes-sigs/kind`, `kubernetes/kubernetes/kubectl` | Bumping kind changes the cluster's Kubernetes version, and kubectl tracks that node's Kubernetes minor. |
 | `dev tooling` | `aquaproj/aqua`, `aquaproj/aqua-registry`, `aquaproj/aqua-renovate-config`, `helm/helm` | Not coupled to anything — batched only to cut PR volume. |
-| `docs site` | `npm` (vitepress, mermaid, vue, …) | All validated by the same `npm run docs:build`. |
+| `docs site` | `npm` (vitepress, mermaid, vue, …) | All validated by the same `npm run docs:build`. `mermaid` is additionally capped at `<12` — see below. |
 | `github actions` | `github-actions` | All validated by CI running at all. |
 
 ::: warning The `go` directive needs `rangeStrategy: bump`
@@ -205,4 +205,18 @@ To see which node image the pinned kind will use:
 ```console
 $ strings "$(aqua which kind)" | grep -o 'kindest/node:v[0-9.]*'
 ```
+:::
+
+::: warning `mermaid` is capped at `<12`
+`vitepress-plugin-mermaid` declares `peerDependencies: { mermaid: "10 || 11" }`
+and 2.0.17 is its latest release, so v12 has no compatible plugin yet.
+
+The failure mode is asymmetric and easy to misread: `npm install` only *warns*
+about the conflict and overrides it, so a v12 lockfile can be written and
+`npm run docs:build` even succeeds — but `npm ci`, which is what
+`docs-lint.yaml` runs, enforces the peer range and fails the resolution
+outright. A v12 bump therefore looks locally fine and is unmergeable in CI.
+
+Raise or drop the `allowedVersions` rule in `.github/renovate.json` as soon as
+the plugin admits v12.
 :::

@@ -73,6 +73,13 @@
       ]
     },
     {
+      "description": "mermaid is held below v12 by vitepress-plugin-mermaid, which declares `peerDependencies: { mermaid: \"10 || 11\" }` as of 2.0.17 — its latest release. `npm install` only warns and overrides that range, so a v12 lockfile can be written, but `npm ci` (what docs-lint.yaml runs) enforces it and fails the resolution outright, leaving the docs site uninstallable. Raise or drop this the moment the plugin admits v12; #98 is the update it blocked.",
+      "matchDepNames": [
+        "mermaid"
+      ],
+      "allowedVersions": "<12"
+    },
+    {
       "description": "Workflow actions batch together; they share one validation — CI running at all.",
       "groupName": "github actions",
       "matchManagers": [
