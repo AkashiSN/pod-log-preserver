@@ -42,4 +42,4 @@ packages:
   # test/e2e/kind/kind.yaml deliberately pins none, so the Kubernetes version
   # follows this pin. kubectl tracks that node's Kubernetes minor.
   - name: kubernetes-sigs/kind@v0.33.0
-  - name: kubernetes/kubernetes/kubectl@v1.37.0
+  - name: kubernetes/kubernetes/kubectl@v1.37.1
