@@ -54,10 +54,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
-      - uses: aquaproj/aqua-installer@v4.0.5
+      - uses: aquaproj/aqua-installer@v4.1.0
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         with:
-          aqua_version: v2.62.3
+          aqua_version: v2.64.0
       - name: Cache Go + aqua tools
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         uses: actions/cache@v6
@@ -78,10 +78,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
-      - uses: aquaproj/aqua-installer@v4.0.5
+      - uses: aquaproj/aqua-installer@v4.1.0
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         with:
-          aqua_version: v2.62.3
+          aqua_version: v2.64.0
       - name: Cache Go + aqua tools
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.chart == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.infra == 'true'
         uses: actions/cache@v6
