@@ -6,7 +6,7 @@
 # for reproducibility. When bumping the go.mod Go version, update this tag and
 # re-resolve the digest:
 #   docker buildx imagetools inspect golang:<ver>-bookworm --format '{{.Manifest.Digest}}'
-FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm@sha256:648f440f42a0958804efb24df176f806f9d353b41f1c0627f666428e40310f6b AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-bookworm@sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f093e98eb95c0352bb84b0 AS build
 
 WORKDIR /src
 
